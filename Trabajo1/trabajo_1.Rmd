@@ -1,0 +1,136 @@
+---
+title: "Trabajo 1"
+author: "Predicción del número de hijos de los hogares colombianos"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Integrantes
+* Santiago Franco Valencia
+* Stephany Lobo
+* Isabela Lujan Jaramillo
+* Daniel Alexander Naranjo Ríos
+* Ana María Sánchez Henao
+
+```{r setup, include=FALSE}
+setwd("C:/Users/s540/Documents/U/Semestres/2021-1S/TAE/TRABAJO 1")
+load("datos.RData")
+```
+
+# Objetivo
+El objetivo de este trabajo es predecir el número de hijos que hay en los hogares colombianos a partir de características específicas partiendo de la encuesta de calidad de vida más reciente publicada por el DANE (2019).
+
+# Introducción
+Las encuestas dirigidas a hogares constituyen una de las principales fuentes de datos socioeconómicos con las que cuentan los países. A partir de la información obtenida de ellas se calculan indicadores para la medición de variados aspectos económicos y sociales. Además, facilitan el conocimiento y explicación de los determinantes o factores causales del comportamiento de dichos aspectos, lo cual es de gran importancia para el diseño, monitoreo y medición de resultados de las políticas públicas.” (DANE, 2018). Por ello son herramientas muy usadas actualmente por el gobierno, aprovechando la alta capacidad  que tienen para recoger grandes cantidades de información rápidamente, sobre todo cuando dicha información proviene de la percepción que tiene el pueblo o las condiciones en las que cada ciudadano vive. Para ello, se crearon instituciones como el departamento administrativo nacional de estadísticas (DANE), que se encarga de planear, recopilar, procesar, analizar y difundir las estadísticas oficiales referentes a información de interés referente a varias situaciones actuales del país y su población.
+
+
+
+# Contextualización de la encuesta
+Las encuestas a hogares normalmente se centran en temas específicos como, por ejemplo, la Encuesta de Mercado Laboral (Gran Encuesta Integrada de Hogares) que se aplica en forma regular y continua durante todo el año. Otro ejemplo es la Encuesta Nacional de Presupuestos de los Hogares que se aplica cada diez años. Si bien estas encuestas indagan sobre algunos aspectos que permiten hacer análisis particulares del bienestar, no brindan información que posibilite conocer íntegramente las diferentes variables que determinan las condiciones de vida del hogar en todas sus dimensiones.” (DANE, 2018). Estas encuestas incluso abarcan temas como la calidad de vida de los colombianos, como lo hace la encuesta nacional de calidad de vida, la cual es realizada por el DANE cada año aproximadamente, y que será la base de donde se extraerá la información para este trabajo. Tomando en cuenta cada una de las variables presentadas en la misma y depurando aquellas que no sean de interés para el objetivo final.
+
+# Problemas encontrados 
+
+
+# Variables a considerar 
+
+La encuesta se encuentra conformada por 14 bases de datos en total. Para la selección de variables se realizó un estudio riguroso de las variables a considerar teniendo en cuenta características específicas del hogar y del jefe de hogar. A continuación un listado de las variables seleccionadas por cada base de datos.
+
+### Datos de la vivienda
+* Alcantarillado:  (1. Sí - 2. No)
+* Acueducto:  (1. Sí - 2. No)
+* Estrato para tarifa:
+1. Bajo - Bajo
+2. Bajo
+3. Medio - Bajo
+4. Medio
+5. Medio - Alto
+6. Alto
+8. Planta eléctrica
+9. No conoce el estrato o no cuenta con recibo de pago.
+0. Recibos sin estrato o el servicio es pirata
+* Tipo de vivienda:
+1. Casa
+2. Apartamento
+3. Cuarto(s)
+4. Vivienda tradicional indigena
+5. Otro (carpa, contenedor, vagón, embarcación, cueva, refugio natural, etc)
+* Región:
+1. Caribe
+2. Oriental
+3. Central
+4. Pacífica(sin valle)
+5. Bogotá
+6. Antioquia
+7. Valle del cauca
+8. San Andrés
+9. Orinoquía - amazonía
+
+### Servicios del hogar (PENDIENTE)
+* Número de cuartos que dispone el hogar
+* Número de dormitorios que dispone el hogar
+* Cortes o suspensiones de energía por falta de pago: (1. Sí - 2. No)
+
+### Caracteristicas y composicion del hogar
+* Conyuges:
+0. No tiene
+1. Sí vive en el hogar
+2. No vive en el hogar
+* El padre vive en el hogar:
+1. Sí
+2. No
+3. Fallecido
+* Educación padre:
+1. Primaria incompleta
+2. Primaria completa
+3. Secundaria incompleta
+4. Secundaria completa
+5. Tecnica incompleta
+6. Tecnica completa
+7. Universidad incompleta
+8. Universidad completa
+9. Ninguno
+10. No sabe
+* La madre vive en el hogar:
+1. Sí
+2. No
+3. Fallecida
+* Educación madre:
+1. Primaria incompleta
+2. Primaria completa
+3. Secundaria incompleta
+4. Secundaria completa
+5. Tecnica incompleta
+6. Tecnica completa
+7. Universidad incompleta
+8. Universidad completa
+9. Ninguno
+10. No sabe
+* Cultura
+1. Indígena
+2. Gitano (a) (Rom)
+3. Raizal del archipiélago de San Andrés, Providencia y Santa Catalina
+4. Palenquero (a) de San Basilio
+5. Negro (a), mulato (a) (afrodescendiente), afrocolombiano(a)
+6. Ninguno de los anteriores
+
+### Tenencia y financiación de la vivienda que ocupa el hogar
+* La vivienda ocupada por este hogar es:
+1. Propia, totalmente pagada
+2. Propia, la están pagando
+3. En arriendo o subarriendo
+4. Con permiso del propietario, sin pago alguno (usufructuario)
+5. Posesión sin título (ocupante de hecho)
+6. Propiedad colectiva
+
+* ¿Cuánto pagan mensualmente por arriendo?
+
+###  Uso de energéticos del hogar
+* Número de computadores en el hogar
+
+### Fuerza de trabajo
+* Exige mucho esfuerzo físico
+* Exige mucho esfuerzo intelectual
+
+# Definición del usuario
+
