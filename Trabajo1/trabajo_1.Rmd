@@ -13,6 +13,14 @@ output:
 * Daniel Alexander Naranjo Ríos
 * Ana María Sánchez Henao
 
+```{r a, include=FALSE}
+library(ggplot2)
+library(gridExtra)
+library(GGally)
+library(Amelia)
+```
+
+
 ```{r setup, include=FALSE}
 setwd("C:/Users/s540/Documents/U/Semestres/2021-1S/TAE/TRABAJO 1")
 load("datos.RData")
@@ -34,7 +42,7 @@ Las encuestas a hogares normalmente se centran en temas específicos como, por e
 
 # Variables a considerar 
 
-La encuesta se encuentra conformada por 14 bases de datos en total. Para la selección de variables se realizó un estudio riguroso de las variables a considerar teniendo en cuenta características específicas del hogar y del jefe de hogar. A continuación un listado de las variables seleccionadas por cada base de datos.
+La encuesta se encuentra conformada por 14 bases de datos en total. Para la selección de variables se realizó un estudio riguroso de las variables a considerar teniendo en cuenta características específicas del hogar y del jefe de hogar. La base de datos tiene 93993 registros y 57 variables. A continuación un listado de las variables seleccionadas por cada base de datos.
 
 ### Datos de la vivienda
 * Alcantarillado:  (1. Sí - 2. No)
@@ -70,7 +78,27 @@ La encuesta se encuentra conformada por 14 bases de datos en total. Para la sele
 * Número de cuartos que dispone el hogar
 * Número de dormitorios que dispone el hogar
 * Cortes o suspensiones de energía por falta de pago: (1. Sí - 2. No)
-
+* Cambios bruscos del voltaje
+* Bajo voltaje
+* Iluminación principal 
+* Servicio de gas natural
+* Tipo servicio sanitario
+* Ubicación servicio sanitario
+* Lavadero
+* Lavamanos
+* Lavaplatos
+* Jabón de manos
+* Clasificación basura
+* Bombillas bajo consumo
+* Plancha
+* Reutiliza agua
+* Recolecta agua lluvia
+* Tanque sanitario bajo consumo
+* Obtención de agua para alimentos
+* Servicio agua 24 horas
+* Ubicación preparación energía
+* Tipo de energía
+* Cantidad de personas en el hogar
 ### Caracteristicas y composicion del hogar
 * Conyuges:
 0. No tiene
@@ -113,6 +141,11 @@ La encuesta se encuentra conformada por 14 bases de datos en total. Para la sele
 4. Palenquero (a) de San Basilio
 5. Negro (a), mulato (a) (afrodescendiente), afrocolombiano(a)
 6. Ninguno de los anteriores
+* Es campesino (1. Sí - 2. No)
+* Condición de vida
+0 significa que se siente "totalmente insatisfecho" y 10 significa que se
+siente "totalmente satisfecho".
+
 
 ### Tenencia y financiación de la vivienda que ocupa el hogar
 * La vivienda ocupada por este hogar es:
@@ -122,7 +155,6 @@ La encuesta se encuentra conformada por 14 bases de datos en total. Para la sele
 4. Con permiso del propietario, sin pago alguno (usufructuario)
 5. Posesión sin título (ocupante de hecho)
 6. Propiedad colectiva
-
 * ¿Cuánto pagan mensualmente por arriendo?
 
 ###  Uso de energéticos del hogar
@@ -132,5 +164,110 @@ La encuesta se encuentra conformada por 14 bases de datos en total. Para la sele
 * Exige mucho esfuerzo físico
 * Exige mucho esfuerzo intelectual
 
+# ¿Cómo se encontró y?
+
+# Análisis descriptivo 
+El primer filtro para descartar alguna de las variables consiste en graficar boxplots para variables categóricas y gráficos de dispersión para las variables numéricas, al ser tantas variables se mostrará algunos ejemplos de las variables que descartamos y las que por su resultado, se considerarán en el modelo.
+
+
+
+
+
+### Variables categóricas
+
+Se encontraron muchas variables que no son significativas a la hora de graficarlas ya que su media permanecía constante al número de hijos y se pudo comprobar que no aportaban mucha información, un ejemplo de estos gráficos se encuentra a continuación:
+
+```{r, tidy=TRUE, out.width="80%",fig.align="center"}
+################ gráficos juntos #########################
+# fuente principal de energia
+a <- ggplot(aes(y= hijos, x = ilum_ppal), data=datos) + geom_boxplot() +
+  xlab("fuente principal de energía") 
+# agua 24 horas
+b <- ggplot(aes(y= hijos, x = agua_24h), data=datos) + geom_boxplot() +
+  xlab("agua 24 horas")
+# estrato
+c <- ggplot(aes(y= hijos, x = estrato), data=datos) + geom_boxplot() + 
+  xlab("estrato para tarifa")
+# corte luz
+d <- ggplot(aes(y= hijos, x = corte_energia_fp), data=datos) + geom_boxplot() + xlab("corte de luz por falta de pago")
+grid.arrange(a, b,c,d)
+```
+
+En estos gráficos se observa que para variables como fuente principal de energía, si la vivienda tenía agua las 24 horas del día, estrato por tarifa y algún corte de luz en los últimos 30 días no aportan mucha información para el número de hijos, contrario a lo que se pensaba, pues son variables directamente relacionadas con la calidad de vida, siguiendo este análisis, así fueron removidas algunas variables para implementar un modelo con las variables más cercanas. 
+
+Por otro lado, también se encontraron variables que aunque su variación no es mucha, se consideró prudente dejarlas para la implementación del modelo, pues se llegó a la conclusión que eran importantes a la hora de evaluar el número de hijos. Alguna de estas variables son:
+
+```{r, out.width="80%",fig.align="center"}
+# boxplot tipo de vivienda
+e <- ggplot(aes(y= hijos, x =tipo_vivienda), data=datos) + geom_boxplot()+xlab("tipo de vivienda")
+# obtención agua
+f <- ggplot(aes(y= hijos, x = obtencion_agua_alimento), data=datos) + geom_boxplot() + xlab("obtención de agua para alimentos")
+# conyugues
+g <- ggplot(aes(y= hijos, x = conyuges), data=datos) + geom_boxplot() +
+  xlab("conyuge vive en el hogar")
+# cultura
+h <- ggplot(aes(y= hijos, x =cultura), data=datos) + geom_boxplot()
+grid.arrange(e,f,g,h)
+```
+
+Como grupo, se encontró que se podían pasar otras variables al siguiente filtro, el cual será el modelo en sí, pues aunque se piense que son necesarias solamente el modelo podrá decir qué tan significativas son y si efectivamente se deben retirar.
+
+### Variables continuas
+
+Para las variables continuas se utilizó la matriz de correlación.
+
+```{r, out.width="80%",fig.align="center"}
+ggcorr(datos[,-2], method = c("pairwise", "spearman"))
+```
+
+Como se puede observar en la matriz de correlación, la variable que más se relaciona con número de hijos es la cantidad de personas en el hogar, y muy levemente el número de dormitorios también junto con el ingreso del hogar y el gasto promedio. Aunque las relaciones no son muy fuertes, se dejarán para el siguiente filtro y observar si la poca relación que muestra el gráfico en realidad es significativa.
+
+
+**Otro tipo de gráficos**
+
+```{r b,out.width="80%",fig.align="center"}
+# cantidad personas
+i <- ggplot(datos, aes(x=as.factor(CANT_PERSONAS_HOGAR) )) +
+  geom_bar(color="blue", fill=rgb(0.1,0.4,0.5,0.7) ) +
+  xlab("cantidad personas en el hogar") + ylab("frecuencia")
+# número dormitorios
+j <- ggplot(datos, aes(x=as.factor(num_dormitorios) )) +
+  geom_bar(color="blue", fill=rgb(0.1,0.4,0.5,0.7) ) +
+  xlab("numero de dormitorios") + ylab("frecuencia")
+# número computadores
+k <- ggplot(datos, aes(x=as.factor(num_computadores) )) +
+  geom_bar(color="blue", fill=rgb(0.1,0.4,0.5,0.7) )+
+  xlab("numero de computadores") + ylab("frecuencia")
+grid.arrange(i,j,k)
+```
+
+La mayoría de hogares están conformados por entre dos y tres personas, también se encontró que el número de cuartos más recurrente es uno, y al preguntar por cantidad de computadores en el hogar, los gráficos indican que la mayoría respondieron entre no tiene y solo uno en el hogar.
+
+### Valores faltantes
+
+Con ayuda del siguiente gráfico se detectaron los valores faltantes que se encontraban en la base de datos.
+
+```{r, out.width="80%",fig.align="center"}
+missmap(datos, main = "Valores faltantes vs. Observados")
+```
+
+Las variables en las que se encontraron valores faltantes además de las que se pueden observar en el gráfico son:
+
+* ubicación servicio sanitario
+* educación madre
+* condición de vida
+* tipo energía
+* estrato
+* es campesino
+
+La manera de resolver los datos faltantes consistió en hacer un reemplazo en los valores faltantes con la moda correspondiente de cada columna ya que como se observa en el gráfico, los valores faltantes corresponden solo al 1% de los datos en total. 
+
 # Definición del usuario
+# Materiales
+# Métodos
+# Resultados
+# Conclusiones
+# Bibliografía
+
+
 
