@@ -18,6 +18,7 @@ library(ggplot2)
 library(gridExtra)
 library(GGally)
 library(Amelia)
+library(reticulate)
 ```
 
 
@@ -166,7 +167,18 @@ siente "totalmente satisfecho".
 
 # ¿Cómo se encontró y?
 
+De la base de datos características y composición del hogar se tomó la variable P6051 correspondiente a una pregunta hecha a cada miembro del hogar, la cual era ¿cuál es la dirección directa con el jefe(a) de hogar? El número 3 correspondía a los hijos.
+
+También se realizó un ID único que uniera las bases de datos de hogares y personas, por medio de este ID único se buscaba tener un índice único para cada hogar, este fue asignado a la base de datos servicio del hogar ya que esta base en total contaba el número de hogares únicos. 
+
+Una vez obtenido el índice se unieron las bases de datos de servicios del hogar y composición del hogar, se filtraron todos los "3" de la variable P6051 la cual correspondía al número de hijos en todos los hogares. Se realizó un conteo por cada índice único del hogar para los hijos y se creó una nueva variable.
+
+Para garantizar que los datos no eran repetidos, en la base de datos de servicios del hogar, se extrayeron los conteos para eliminar las observaciones repetidas correspondientes a las personas que hacían parte del hogar para obtener finalmente la variable hijos por cada hogar. 
+
+
+
 # Análisis descriptivo 
+
 El primer filtro para descartar alguna de las variables consiste en graficar boxplots para variables categóricas y gráficos de dispersión para las variables numéricas, al ser tantas variables se mostrará algunos ejemplos de las variables que descartamos y las que por su resultado, se considerarán en el modelo.
 
 
@@ -193,7 +205,7 @@ d <- ggplot(aes(y= hijos, x = corte_energia_fp), data=datos) + geom_boxplot() + 
 grid.arrange(a, b,c,d)
 ```
 
-En estos gráficos se observa que para variables como fuente principal de energía, si la vivienda tenía agua las 24 horas del día, estrato por tarifa y algún corte de luz en los últimos 30 días no aportan mucha información para el número de hijos, contrario a lo que se pensaba, pues son variables directamente relacionadas con la calidad de vida, siguiendo este análisis, así fueron removidas algunas variables para implementar un modelo con las variables más cercanas. 
+En estos gráficos se observa que para variables como fuente principal de energía, si la vivienda tenía agua las 24 horas del día, estrato por tarifa y algún corte de luz en los últimos 30 días no aportan mucha información para el número de hijos, contrario a lo que se pensaba, pues son variables directamente relacionadas con la calidad de vida.
 
 Por otro lado, también se encontraron variables que aunque su variación no es mucha, se consideró prudente dejarlas para la implementación del modelo, pues se llegó a la conclusión que eran importantes a la hora de evaluar el número de hijos. Alguna de estas variables son:
 
@@ -210,20 +222,9 @@ h <- ggplot(aes(y= hijos, x =cultura), data=datos) + geom_boxplot()
 grid.arrange(e,f,g,h)
 ```
 
-Como grupo, se encontró que se podían pasar otras variables al siguiente filtro, el cual será el modelo en sí, pues aunque se piense que son necesarias solamente el modelo podrá decir qué tan significativas son y si efectivamente se deben retirar.
+Cabe recalcar que aunque se piense que son necesarias solamente el modelo podrá decir qué tan significativas son y si efectivamente se deben retirar.
 
 ### Variables continuas
-
-Para las variables continuas se utilizó la matriz de correlación.
-
-```{r, out.width="80%",fig.align="center"}
-ggcorr(datos[,-2], method = c("pairwise", "spearman"))
-```
-
-Como se puede observar en la matriz de correlación, la variable que más se relaciona con número de hijos es la cantidad de personas en el hogar, y muy levemente el número de dormitorios también junto con el ingreso del hogar y el gasto promedio. Aunque las relaciones no son muy fuertes, se dejarán para el siguiente filtro y observar si la poca relación que muestra el gráfico en realidad es significativa.
-
-
-**Otro tipo de gráficos**
 
 ```{r b,out.width="80%",fig.align="center"}
 # cantidad personas
@@ -262,12 +263,35 @@ Las variables en las que se encontraron valores faltantes además de las que se 
 
 La manera de resolver los datos faltantes consistió en hacer un reemplazo en los valores faltantes con la moda correspondiente de cada columna ya que como se observa en el gráfico, los valores faltantes corresponden solo al 1% de los datos en total. 
 
+# Selección de variables
+
+Aunque el análisis descriptivo dio una idea intuitiva de cuáles variables podrían ser seleccionadas en el modelo, el grupo decidió que era importante requerir una prueba específica para la selección de variables.
+
+El método empleado para la selección de variables fue con la prueba estadística chi-cuadrado la cual devuelve las 10 variables más relacionadas con la variable respuesta, en este caso, las variables que tuvieran una relación fuerte con los hijos. Los resultados obtenidos son:
+
+| Variable | Puntaje |
+|:-:|:-:|
+| I_UGASTO | 2.095865e+09 |
+| I_HOGAR | 2.067919e+09 |
+| arriendo | 1.376606e+08 |
+| CANT_PERSONAS_HOGAR | 5.841541e+04 |
+| num_dormitorios | 9.660812e+03 |
+| tipo_serv_sanitario | 2.351219e+03 |
+| conyuges | 2.028149e+03 |
+| num_cuartos | 1.416181e+04 |
+| obtencion_agua_alimento | 1.343717e+03 |
+
+Finalmente, estas son las 10 variables seleccionadas para el modelo.
+
+_nota_ este método fue empleado en Python. [Link](https://colab.research.google.com/drive/1tdPmb7ntUu1AwwgactC-YXp6LC4eptlF?authuser=1#scrollTo=tdLbPiuH26ed/ "Colaboratory") 
+
 # Definición del usuario
 # Materiales
 # Métodos
 # Resultados
 # Conclusiones
 # Bibliografía
+
 
 
 
