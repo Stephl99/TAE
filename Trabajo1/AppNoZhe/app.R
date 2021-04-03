@@ -8,6 +8,7 @@
 #
 
 library(shiny)
+library(randomForest)
 source("./predRF.R")
 
 # Define UI for application that draws a histogram
@@ -16,7 +17,6 @@ ui <- fluidPage(
     # Application title
     titlePanel("APLICACIÓN PARA PREDECIR EL NÚMERO DE HIJOS DE UN HOGAR"),
 
-    # Sidebar with a slider input for number of bins 
     sidebarLayout(
         # Input: Simple integer interval ----
         
@@ -67,21 +67,16 @@ ui <- fluidPage(
     )
 )
 
-#loadRDS
-
-
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     observeEvent(input$predecir_hijos, {
-        output$Boton_Ok <-renderText("El numero de hijo es: ")
-    })
-    output$predicc <- renderText({
-        # Predicción del modelo:
-        
-        evaluables <- c(as.double(input$I_UGASTO), as.double(input$I_HOGAR), as.double(input$arriendo), as.double(input$CANT_PERSONAS_HOGAR), as.double(input$num_dormitorios),
-                        as.integer(input$tipo_serv_sanitario), as.integer(input$conyuges), as.double(input$num_cuartos), as.integer(input$obtencion_agua_alimento), 0)
-        prediccion <- as.integer(predRF(evaluables))-1
-    })
+        output$predicc <- renderText({
+            # Predicción del modelo:
+            evaluables <- c(as.double(input$I_UGASTO), as.double(input$I_HOGAR), as.double(input$arriendo), as.double(input$CANT_PERSONAS_HOGAR), as.double(input$num_dormitorios),
+                            as.integer(input$tipo_serv_sanitario), as.integer(input$conyuges), as.double(input$num_cuartos), as.integer(input$obtencion_agua_alimento), 0)
+            prediccion <- as.integer(predRF(evaluables))-1
+            })
+        })
 }
 
 # Run the application
