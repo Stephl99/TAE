@@ -24,7 +24,7 @@ ui <- fluidPage(
         tags$style(
             HTML("
 
-      @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@300&family=Raleway:wght@200&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@300&family=Raleway:wght@200&display=swap');
 
         #title{
             font-family: 'Raleway', sans-serif;
