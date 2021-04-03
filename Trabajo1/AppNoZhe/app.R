@@ -8,7 +8,7 @@
 #
 
 library(shiny)
-source("predRF.R")
+source("./predRF.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -73,7 +73,7 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     observeEvent(input$predecir_hijos, {
-        output$Boton_Ok <-renderText("Botón funciona!")
+        output$Boton_Ok <-renderText("El numero de hijo es: ")
     })
     output$predicc <- renderText({
         # Predicción del modelo:

@@ -1,8 +1,9 @@
-load("modeloB.RData")
+load("./modeloB.RData")
+load("./df_aux.RData")
 
 predRF = function(eval) {
-  cosaaa <- rbind(cosaaa1, eval)
-  prediction <- predict(modelo, cosaaa[2, 1:9])
+  df_aux2 <- rbind(df_aux, eval)
+  prediction <- predict(modelo, df_aux2[2, 1:9])
   return(prediction)
 }
 
