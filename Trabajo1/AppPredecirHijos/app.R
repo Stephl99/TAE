@@ -2,15 +2,15 @@
 # Técnicas en Aprendizaje Estadístico - Semestre 01 2021
 # Universidad Nacional de Colombia
 #
-#' @Authors:
-#'     Isabela Luján Jaramillo
-#'     Daniel Alexander Naranjo Ríos
-#'     Ana María Sanchez Henao
-#'     Stephany Michell Lobo
-#'     Santiago Franco Valencia
-#' 
-# 
-#
+#' @Authors:#' 
+#'     * Santiago Franco Valencia
+#'     * Stephany Lobo
+#'     * Isabela Lujan Jaramillo
+#'     * Daniel Alexander Naranjo Ríos
+#'     * Ana María Sánchez Henao
+#'
+#'
+#'
 
 library(shiny)
 library(randomForest)
@@ -263,11 +263,12 @@ server <- function(input, output) {
     
     #Autores
     output$Authors <- renderText({
-            "Hecho Por:\n Isabela Luján Jaramillo,
-            Daniel Alexander Naranjo Ríos,
-            Ana María Sanchez Henao,
-            Stephany Michell Lobo,
-            Santiago Franco Valencia"
+            "Hecho Por:
+            Santiago Franco Valencia,
+            Stephany Lobo,
+            Isabela Lujan Jaramillo,
+            Daniel Alexander Naranjo Ríos y 
+            Ana María Sánchez Henao"
     })
     
 }
