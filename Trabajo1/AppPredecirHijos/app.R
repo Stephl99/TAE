@@ -5,10 +5,9 @@
 #' @Authors:#' 
 #'     * Santiago Franco Valencia
 #'     * Stephany Lobo
-#'     * Isabela Lujan Jaramillo
+#'     * Isabela Luján Jaramillo
 #'     * Daniel Alexander Naranjo Ríos
 #'     * Ana María Sánchez Henao
-#'
 #'
 #'
 
@@ -78,8 +77,13 @@ ui <- fluidPage(title="Predicción de hijos",
     #APP CODE
     
     # Application title
-    titlePanel( textOutput("title_panel")),
-    
+    titlePanel( 
+        # textOutput("title_panel"),
+        tags$div(class = "title_panel", checked = NA,
+                 tags$h2("RAMILIA", style = "font-weight: bold; font-size: 40px; text-align: center;"),
+                 tags$p("Aplicación para predecir el número de hijos de un hogar", style = "font-size: 30px; text-align: center;"),
+        ),
+    ),
     sidebarLayout(
         sidebarPanel (
             id = "SideBar",
@@ -210,7 +214,7 @@ ui <- fluidPage(title="Predicción de hijos",
                      br(),
                      br(),
                      tags$p("Link al reporte técnico:", style="font-size:20px"),
-                     tags$a(href = "https://guthib.com", "Click aquí para ir al reporte técnico en RPubs", style="font-size:15px"),
+                     tags$a(href = "https://rpubs.com/StephanyL/749703", "Click aquí para ir al reporte técnico en RPubs", style="font-size:15px"),
                      br(),
                      br(),
                      tags$p("Link al repositorio de GitHub:", style="font-size:20px"),
@@ -220,6 +224,9 @@ ui <- fluidPage(title="Predicción de hijos",
             br(),
             br(),
             textOutput("Authors"),
+            br(),
+            img(src = "LogoUNAL.png", height = 88.5, width = 200, alt="Logo de la Universidad Nacional de Colombia"),
+            br(),
         )
     )
 )
@@ -227,12 +234,11 @@ ui <- fluidPage(title="Predicción de hijos",
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     output$title_panel <- renderText({
-        "APLICACIÓN PARA PREDECIR EL NÚMERO DE HIJOS DE UN HOGAR"
+        "RAMILIA"
     })
     output$description <- renderText({
-        "Responda por favor a las preguntas que se le harán en el
-        panel de la izquierda, con base en la información que proporcione se
-        predecirá el número de hijos que habita su vivienda."
+        "Por favor proporcione la información que se le pide en el formulario, 
+        con base en ella se predecirá el número de hijos que habita en la vivienda."
     })
     observeEvent(input$predecir_hijos, {
         # Texto natural para la respuesta
@@ -260,7 +266,6 @@ server <- function(input, output) {
             prediccion <- as.integer(predRF(evaluables)) - 1
         })
     })
-    
     #Autores
     output$Authors <- renderText({
             "Hecho Por:
@@ -270,7 +275,6 @@ server <- function(input, output) {
             Daniel Alexander Naranjo Ríos y 
             Ana María Sánchez Henao"
     })
-    
 }
 
 # Run the application

@@ -1,0 +1,12 @@
+name: AppPredecirHijos
+title: AppPredecirHijos
+username:
+account: isabelaunal
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3904823
+bundleId: 4431025
+url: https://isabelaunal.shinyapps.io/AppPredecirHijos/
+when: 1617572723.04616
+asMultiple: FALSE
+asStatic: FALSE
