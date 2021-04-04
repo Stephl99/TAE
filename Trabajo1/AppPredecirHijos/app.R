@@ -17,7 +17,8 @@ library(randomForest)
 source("./predRF.R")
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
+ui <- fluidPage(title="Predicción de hijos",
+    
     #CSS
     
     tags$head(# Note the wrapping of the string in HTML()
@@ -64,6 +65,11 @@ ui <- fluidPage(
         }
         #predecir_hijos:hover{
             background-color: #ebadd6
+        }
+        #links{
+            font-family: 'Raleway', sans-serif;
+            font-weight: bold;
+            font-size: 20px;
         }
         
         "
@@ -198,7 +204,22 @@ ui <- fluidPage(
             br(),
             br(),
             #Excavadora goes brrrrr
-            textOutput("Authors")
+            tags$div(class = "links", checked = NA,
+                     tags$p("Link al video:", style="font-size:20px"),
+                     tags$a(href = "https://guthib.com", "Click aquí para ir al video promocional de la App", style="font-size:15px"), 
+                     br(),
+                     br(),
+                     tags$p("Link al reporte técnico:", style="font-size:20px"),
+                     tags$a(href = "https://guthib.com", "Click aquí para ir al reporte técnico en RPubs", style="font-size:15px"),
+                     br(),
+                     br(),
+                     tags$p("Link al repositorio de GitHub:", style="font-size:20px"),
+                     tags$a(href = "https://github.com/Stephl99/TAE", "Click aquí para ir al repositorio de GitHub", style="font-size:15px"),
+            ),
+            br(),
+            br(),
+            br(),
+            textOutput("Authors"),
         )
     )
 )
@@ -240,25 +261,7 @@ server <- function(input, output) {
         })
     })
     
-    #LINKS A OTROS ARCHIVOS
-    output$link1 <- renderText({
-        "Link al vídeo:"
-    })
-    output$linkVideo <- renderText({
-        " # LINK AQUÍ"
-    })
-    output$link2 <- renderText({
-        "Link al reporte técnico:"
-    })
-    output$linkRPubs <- renderText({
-        "#LINK AQUÍ"
-    })
-    output$link3<- renderText({
-        "Link al repositorio en GitHub:"
-    })
-    output$linkGithub <- renderText({
-        "https://github.com/Stephl99/TAE"
-    })
+    #Autores
     output$Authors <- renderText({
             "Hecho Por:\n Isabela Luján Jaramillo,
             Daniel Alexander Naranjo Ríos,
