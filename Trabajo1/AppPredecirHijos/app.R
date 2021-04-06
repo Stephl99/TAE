@@ -210,7 +210,7 @@ ui <- fluidPage(title="Predicción de hijos",
             #Excavadora goes brrrrr
             tags$div(class = "links", checked = NA,
                      tags$p("Link al video:", style="font-size:20px"),
-                     tags$a(href = "https://guthib.com", "Click aquí para ir al video promocional de la App", style="font-size:15px"), 
+                     tags$a(href = "https://youtu.be/llRkIAfkS04", "Click aquí para ir al video promocional de la App", style="font-size:15px"), 
                      br(),
                      br(),
                      tags$p("Link al reporte técnico:", style="font-size:20px"),
