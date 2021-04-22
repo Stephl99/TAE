@@ -12,6 +12,7 @@
 #'
 
 library(shiny)
+library(shinyWidgets)
 library(randomForest)
 source("./predRF.R")
 
@@ -81,44 +82,52 @@ ui <- fluidPage(title="Predicción de hijos",
         # textOutput("title_panel"),
         tags$div(class = "title_panel", checked = NA,
                  tags$h2("RAMILIA", style = "font-weight: bold; font-size: 40px; text-align: center;"),
-                 tags$p("Aplicación para predecir el número de hijos de un hogar", style = "font-size: 30px; text-align: center;"),
-        ),
+                 tags$p("Aplicación para predecir el número de hijos de un hogar", style = "font-size: 30px; text-align: center;")
+        )
     ),
     sidebarLayout(
         sidebarPanel (
             id = "SideBar",
             br(),
-            #Input del gasto mensual del hogar
-            numericInput(
-                "I_UGASTO",
-                "Gasto mensual total del hogar en pesos colombianos:",
-                100000.0,
-                min = 0
+            numericInputIcon( 
+                inputId = "I_UGASTO", 
+                label = "Gasto mensual total del hogar en pesos colombianos [$COP]:", 
+                value = 100000, 
+                min = 0,
+                icon =  icon("dollar-sign")
             ),
             #Input del ingreso mensual del hogar
-            numericInput(
-                "I_HOGAR",
-                "Ingreso mensual total del hogar en pesos colombianos:",
-                100000,
-                min = 0
+            numericInputIcon(
+                inputId = "I_HOGAR",
+                label = "Ingreso mensual total del hogar en pesos colombianos [$COP]:",
+                value = 100000,
+                min = 0,
+                icon = icon("dollar-sign")
             ),
             #Input de cuánto cuesta el arriendo
-            numericInput(
-                "arriendo",
-                "Arriendo mensual del hogar en pesos colombianos:",
-                100000.0,
-                min = 0
+            numericInputIcon(
+                inputId = "arriendo",
+                label = "Arriendo mensual del hogar en pesos colombianos [$COP]:",
+                value = 100000.0,
+                min = 0,
+                icon =  icon("dollar-sign")
             ),
             #Input de cuanta gente vive en el hogar
-            numericInput(
-                "CANT_PERSONAS_HOGAR",
-                "Numero de personas que viven en el hogar:",
-                1 ,
-                min = 0
+            numericInputIcon(
+                inputId = "CANT_PERSONAS_HOGAR",
+                label = "Numero de personas que viven en el hogar [Personas]:",
+                value = 1 ,
+                min = 0,
+                icon = icon("male")
             ),
             #Input de cuantas piezas tiene el hogar
-            numericInput("num_dormitorios", "Numero de dormitorios del hogar:", 3 , min =
-                             0),
+            numericInputIcon(
+                inputId = "num_dormitorios", 
+                label = "Numero de dormitorios del hogar [Dormitorios]:",
+                value = 3 , 
+                min = 0,
+                icon = icon("bed")
+            ),
             #Input para el tipo de sanitario con el que cuenta la vivienda
             selectInput(
                 "tipo_serv_sanitario",
@@ -150,8 +159,13 @@ ui <- fluidPage(title="Predicción de hijos",
                 )
             ),
             #Input de cuantos cuartos (dormitorios y otros) tiene la casa
-            numericInput("num_cuartos", "Numero de cuartos del hogar:", 2 , min =
-                             0),
+            numericInputIcon(
+                inputId = "num_cuartos", 
+                label = "Numero de cuartos (incluyendo dormitorios) del hogar [Cuartos]:",
+                value = 2 ,
+                min = 0,
+                icon = icon("couch")
+                ),
             #Input para saber de donde obtienen el agua de la casa para los alimentos
             selectInput(
                 "obtencion_agua_alimento",
@@ -218,7 +232,7 @@ ui <- fluidPage(title="Predicción de hijos",
                      br(),
                      br(),
                      tags$p("Link al repositorio de GitHub:", style="font-size:20px"),
-                     tags$a(href = "https://github.com/Stephl99/TAE", "Click aquí para ir al repositorio de GitHub", style="font-size:15px"),
+                     tags$a(href = "https://github.com/Stephl99/TAE", "Click aquí para ir al repositorio de GitHub", style="font-size:15px")
             ),
             br(),
             br(),
@@ -226,7 +240,7 @@ ui <- fluidPage(title="Predicción de hijos",
             textOutput("Authors"),
             br(),
             img(src = "LogoUNAL.png", height = 88.5, width = 200, alt="Logo de la Universidad Nacional de Colombia"),
-            br(),
+            br()
         )
     )
 )
