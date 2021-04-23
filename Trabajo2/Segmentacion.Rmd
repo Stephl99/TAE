@@ -1,0 +1,77 @@
+---
+title: "Segmentación para una base de datos simulada"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+suppressMessages(library(tidyverse))
+suppressMessages(library(ggplot2))
+suppressMessages(library(devtools))
+suppressMessages(library(ggbiplot))
+```
+
+
+## Lectura de la base de datos:
+
+```{r}
+dtb <- read.csv("base.csv", sep = ";")
+```
+
+
+## Verificación de NA's:
+```{r}
+sum(is.na(dtb))
+```
+
+NO se encuentran valores faltantes en la base.
+
+## Análisis de componentes principales:
+
+```{r}
+dtb.pca <- prcomp(dtb[,2:length(dtb)])
+summary(dtb.pca )
+```
+
+Se observa que con 3 componentes se explica el 94% de la variabilidad en los datos.
+
+```{r}
+plot(dtb.pca, main = "Porcentaje de variabilidad explicado por cada componente")
+```
+
+```{r}
+#jpeg(filename = "biplot.jpg", width = 1000, height = 1000, units = "px",quality = 100)
+p <- ggbiplot(dtb.pca, choices = c(1,2))
+p <- p + xlim(-1, 1) + ylim(-1,1)
+p
+```
+```{r}
+biplot(dtb.pca)
+```
+
+###Cálculo de distancias:
+```{r}
+scaled_dtb <- scale(dtb[, 2:length(dtb)], center =TRUE, scale = TRUE)
+distances <- dist(scaled_dtb, diag= TRUE)
+```
+
+###Distancias entre todas las variables:
+```{r}
+image(t(as.matrix(distances)))
+
+```
+```{r}
+dim(scaled_dtb)
+#cluster_h <- hclust(scaled_dtb, method = "complete")
+```
+```{r}
+2233 * 46
+```
+```{r}
+cor(scaled_dtb
+    )
+```
+
