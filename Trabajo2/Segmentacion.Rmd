@@ -12,6 +12,7 @@ suppressMessages(library(tidyverse))
 suppressMessages(library(ggplot2))
 suppressMessages(library(devtools))
 suppressMessages(library(ggbiplot))
+suppressMessages(library(corrplot))
 ```
 
 
@@ -71,7 +72,14 @@ dim(scaled_dtb)
 2233 * 46
 ```
 ```{r}
-cor(scaled_dtb
-    )
+correlations <- cor(scaled_dtb)
+corrplot(correlations)
 ```
+
+## Creación de bases de datos acorde al tipo de transacción y tipo de producto:
+
+```{r}
+
+```
+
 
