@@ -43,13 +43,13 @@ Se observa que con 3 componentes se explica el 94% de la variabilidad en los dat
 plot(dtb.pca, main = "Porcentaje de variabilidad explicado por cada componente")
 ```
 
-```{r}
+```{r fig1, fig.height = 10, fig.width = 10}
 #jpeg(filename = "biplot.jpg", width = 1000, height = 1000, units = "px",quality = 100)
-p <- ggbiplot(dtb.pca, choices = c(1,2))
-p <- p + xlim(-1, 1) + ylim(-1,1)
+p <- ggbiplot(dtb.pca, choices = c(1,2), groups = dtb$cxc)
+p <- p + xlim(-0.25, 0.4) + ylim(-0.5,0.5)
 p
 ```
-```{r}
+```{r fig2, fig.width= 10, fig.height=10}
 biplot(dtb.pca)
 ```
 
@@ -61,7 +61,7 @@ distances <- dist(scaled_dtb, diag= TRUE)
 
 ###Distancias entre todas las variables:
 ```{r}
-image(t(as.matrix(distances)))
+#image(t(as.matrix(distances)))
 
 ```
 ```{r}
@@ -79,7 +79,45 @@ corrplot(correlations)
 ## Creación de bases de datos acorde al tipo de transacción y tipo de producto:
 
 ```{r}
+dtb1 <- dtb[, 2:31]
+dtb2 <- dtb[, 32:length(dtb)]
+```
+
+```{r}
+corr1 <- cor(dtb1)
+corr2 <- cor(dtb2)
+```
+
+```{r}
+corrplot(corr1)
+```
+
+```{r}
+corrplot(corr2)
+```
+```{r}
+dtb1_pca <- princomp(dtb1)
+ggbiplot(dtb1_pca) + ylim(-1,1) + xlim(-1,1)
+```
+```{r}
+dtb2_pca <- princomp(dtb2)
+ggbiplot(dtb2_pca, choices = 1:2) + ylim(-1,1) + xlim(-1,1)
+```
+
+```{r}
+kNNdistplot(scaled_dtb, k = 47 )
+abline(h = 20)
+```
+
+```{r}
+cl <- dbscan(scaled_dtb, eps = 20, minPts = 100)
 
 ```
+
+```{r}
+hullplot(scaled_dtb, cl$cluster)
+```
+
+
 
 
