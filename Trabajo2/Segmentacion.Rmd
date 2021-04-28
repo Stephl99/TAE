@@ -13,6 +13,7 @@ suppressMessages(library(ggplot2))
 suppressMessages(library(devtools))
 suppressMessages(library(ggbiplot))
 suppressMessages(library(corrplot))
+suppressMessages(library(caret))
 ```
 
 
@@ -20,6 +21,7 @@ suppressMessages(library(corrplot))
 
 ```{r}
 dtb <- read.csv("base.csv", sep = ";")
+dtb[32:length(dtb)] <- lapply(dtb[32:length(dtb)], factor)
 ```
 
 
@@ -27,36 +29,10 @@ dtb <- read.csv("base.csv", sep = ";")
 ```{r}
 sum(is.na(dtb))
 ```
-
-NO se encuentran valores faltantes en la base.
-
-## Análisis de componentes principales:
-
-```{r}
-dtb.pca <- prcomp(dtb[,2:length(dtb)])
-summary(dtb.pca )
-```
-
-Se observa que con 3 componentes se explica el 94% de la variabilidad en los datos.
-
-```{r}
-plot(dtb.pca, main = "Porcentaje de variabilidad explicado por cada componente")
-```
-
-```{r fig1, fig.height = 10, fig.width = 10}
-#jpeg(filename = "biplot.jpg", width = 1000, height = 1000, units = "px",quality = 100)
-p <- ggbiplot(dtb.pca, choices = c(1,2), groups = dtb$cxc)
-p <- p + xlim(-0.25, 0.4) + ylim(-0.5,0.5)
-p
-```
-```{r fig2, fig.width= 10, fig.height=10}
-biplot(dtb.pca)
-```
-
 ###Cálculo de distancias:
 ```{r}
-scaled_dtb <- scale(dtb[, 2:length(dtb)], center =TRUE, scale = TRUE)
-distances <- dist(scaled_dtb, diag= TRUE)
+scaled_variables <- scale(dtb[, 2:31], center =TRUE, scale = TRUE)
+distances <- dist(scaled_variables, diag= TRUE)
 ```
 
 ###Distancias entre todas las variables:
@@ -64,60 +40,64 @@ distances <- dist(scaled_dtb, diag= TRUE)
 #image(t(as.matrix(distances)))
 
 ```
+## Reescalado de la base de datos:
+
+```{r}
+scaled_dtb <- dtb
+scaled_dtb[,2:31] <- scaled_variables
+```
+
+
+
 ```{r}
 dim(scaled_dtb)
 #cluster_h <- hclust(scaled_dtb, method = "complete")
 ```
-```{r}
-2233 * 46
-```
-```{r}
-correlations <- cor(scaled_dtb)
-corrplot(correlations)
-```
-
 ## Creación de bases de datos acorde al tipo de transacción y tipo de producto:
 
 ```{r}
-dtb1 <- dtb[, 2:31]
-dtb2 <- dtb[, 32:length(dtb)]
+dtb1 <- scaled_dtb[, 2:31]
+dtb2 <- scaled_dtb[, 32:length(dtb)]
 ```
+
+
+## Análisis descriptivo de los datos:
+
+```{r}
+correlations <- cor(dtb1)
+corrplot(correlations)
+```
+
+
 
 ```{r}
 corr1 <- cor(dtb1)
-corr2 <- cor(dtb2)
 ```
 
 ```{r}
 corrplot(corr1)
 ```
 
-```{r}
-corrplot(corr2)
-```
+## Análisis de componentes principales:
+
 ```{r}
 dtb1_pca <- princomp(dtb1)
-ggbiplot(dtb1_pca) + ylim(-1,1) + xlim(-1,1)
+ggbiplot(dtb1_pca, group=dtb2$tiene_ventas_fisicas) + ylim(-1,1) + xlim(-1,1)
 ```
-```{r}
-dtb2_pca <- princomp(dtb2)
-ggbiplot(dtb2_pca, choices = 1:2) + ylim(-1,1) + xlim(-1,1)
-```
+
 
 ```{r}
-kNNdistplot(scaled_dtb, k = 47 )
-abline(h = 20)
+indices <- sample(2232, 500)
+test_dtb <- dtb1[indices,]
 ```
+
 
 ```{r}
-cl <- dbscan(scaled_dtb, eps = 20, minPts = 100)
-
+htest <- hclust(distances)
 ```
+
 
 ```{r}
-hullplot(scaled_dtb, cl$cluster)
+plot(htest)
 ```
-
-
-
 
