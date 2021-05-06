@@ -15,15 +15,37 @@ suppressMessages(library(ggbiplot))
 suppressMessages(library(corrplot))
 suppressMessages(library(caret))
 ```
+Función auxiliar para transformar las variables:
 
+```{r}
+asignar <- function(fila){
+  return (ifelse(sum(fila)==0, 0, which(fila==max(fila))))
+}
+```
 
 ## Lectura de la base de datos:
 
 ```{r}
 dtb <- read.csv("base.csv", sep = ";")
-#dtb[32:length(dtb)] <- lapply(dtb[32:length(dtb)], factor)
 ```
 
+### Canales preferidos:
+
+```{r}
+dtb <- dtb %>% mutate(en_vm_preferido=apply(dtb[2:12], 1, asignar)) %>% 
+  mutate(en_tx_preferido=apply(dtb[13:23], 1, asignar)) %>%
+  mutate(sal_vm_preferido=apply(dtb[24:27], 1, asignar)) %>%
+  mutate(sal_tx_preferido=apply(dtb[28:31], 1, asignar))
+```
+
+### Ponderación canales salientes:
+
+```{r}
+dtb <- dtb %>% mutate(en_vm_ponderado=rowSums(dtb[, 2:12])/1e12) %>% 
+  mutate(en_tx_ponderado = rowSums(dtb[, 13:23])/1e12) %>%
+  mutate(sal_vm_ponderado = rowSums(dtb[, 24:27])/1e12) %>%
+  mutate(sal_tx_ponderado = rowSums(dtb[, 28:31])/1e12)
+```
 
 ## Reescalado de la base de datos:
 
@@ -69,12 +91,12 @@ abline(v=0.5)
 
 ```{r}
 par(mfrow=c(1,2))
-hist(dtb$en_vm_canal1)
-hist(dtb$en_vm_canal2)
+hist(dtb$en_vm_canal1, ylim = c(0,50))
+hist(dtb$en_vm_canal2, ylim = c(0,50))
 ```
 ```{r}
 canalt = rowSums(dtb[, 2:11])/1e11
-quantile(canalt, c(0.8, 0.9, 0.999999999))
+quantile(canalt, c(0.8, 0.9, 0.9999))
 hist(canalt, ylim = c(0,50))
 ```
 
@@ -109,12 +131,79 @@ plot(htest)
 scaled_pca <- princomp(scaled_dtb)
 ggbiplot(scaled_pca) + xlim(-1,1) + ylim(-1,1)
 ```
-```{r}
-summary(scaled_pca)
-```
+
 
 ```{r}
 plot(scaled_pca,type = 'l')
 ```
 
+```{r}
+boxplot(canalt, ylim = c(0,0.2))
+```
+```{r}
+quantile(canalt, 0.75)
+```
 
+```{r}
+clasificar <- dtb[which(canalt <= 0.15),]
+grupo1 <- dtb[which(canalt > 0.15),]
+```
+
+
+```{r}
+grupo1_pca <- princomp(scaled_dtb[which(canalt <= 0.15),])
+ggbiplot(grupo1_pca, groups = clasificar$tiene_ventas_electronicas) + ylim(-3,2.5)
+```
+Variables significativas datos por clasificar:
+
+```{r}
+table(clasificar$tiene_ventas_fisicas)
+```
+
+-Tiene ventas electrónicas:
+
+```{r}
+table(clasificar$tiene_ventas_electronicas)
+```
+
+
+
+```{r}
+outliers_pca <- princomp(scaled_dtb[which(canalt > 0.15),])
+ggbiplot(outliers_pca, groups = grupo1$tiene_ventas_electronicas) + xlim(-1,2) + ylim(-1,1)
+```
+Variables significativas grupo1:
+
+-Totalinventory:
+```{r}
+table(grupo1$totalinventory)
+```
+Tiene ventas físicas y/o digitales
+```{r}
+table(grupo1$tiene_ventas_fisicas)
+table(grupo1$tiene_ventas_electronicas)
+```
+
+## Clustering jerarquíco (tanteo):
+
+```{r}
+dist_grupo1 <- dist(grupo1)
+clust_grupo1 <- hclust(dist_grupo1)
+plot(clust_grupo1)
+```
+
+
+```{r}
+toclust <- dtb[,-(2:31)]
+```
+
+```{r}
+dist_toclust <- dist(toclust[,2:length(toclust)])
+corrplot(cor(toclust[,2:length(toclust)]))
+
+```
+
+```{r}
+clust_clasificar <- hclust(dist_toclust)
+plot(clust_clasificar)
+```
