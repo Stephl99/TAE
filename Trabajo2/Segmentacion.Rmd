@@ -41,10 +41,16 @@ dtb <- dtb %>% mutate(en_vm_preferido=apply(dtb[2:12], 1, asignar)) %>%
 ### Ponderación canales salientes:
 
 ```{r}
-dtb <- dtb %>% mutate(en_vm_ponderado=rowSums(dtb[, 2:12])/1e12) %>% 
-  mutate(en_tx_ponderado = rowSums(dtb[, 13:23])/1e12) %>%
-  mutate(sal_vm_ponderado = rowSums(dtb[, 24:27])/1e12) %>%
-  mutate(sal_tx_ponderado = rowSums(dtb[, 28:31])/1e12)
+dtb <- dtb %>% mutate(en_vm_ponderado=rowSums(dtb[, 2:12])/1e11) %>% 
+  mutate(en_tx_ponderado = rowSums(dtb[, 13:23])/1e11) %>%
+  mutate(sal_vm_ponderado = rowSums(dtb[, 24:27])/1e4) %>%
+  mutate(sal_tx_ponderado = rowSums(dtb[, 28:31])/1e4)
+```
+
+### Pago preferido
+
+```{r}
+dtb <- dtb %>% mutate(persona_pagada = as.numeric(dtb$pagos_pn >dtb$pagos_pj))
 ```
 
 ## Reescalado de la base de datos:
@@ -192,10 +198,13 @@ clust_grupo1 <- hclust(dist_grupo1)
 plot(clust_grupo1)
 ```
 
+Se crea la base de datos llamada toclust, que contiene todos los datos de las variables transformadas:
 
 ```{r}
 toclust <- dtb[,-(2:31)]
 ```
+
+Matriz de distancias y gráfica de correlaciones:
 
 ```{r}
 dist_toclust <- dist(toclust[,2:length(toclust)])
@@ -207,3 +216,43 @@ corrplot(cor(toclust[,2:length(toclust)]))
 clust_clasificar <- hclust(dist_toclust)
 plot(clust_clasificar)
 ```
+
+```{r}
+valorespotenciales <- boxplot.stats(scaled_dtb[,"en_vm_ponderado"])$out
+```
+
+Se observa que el percentil 75 de los datos estándarizados contiene más de
+```{r}
+p75 <- quantile(scaled_dtb[,"en_vm_ponderado"], 0.975)
+empresasgrandes <- valorespotenciales[valorespotenciales > p75]
+indices_grandes <- which(scaled_dtb[,"en_vm_ponderado"] %in% c(empresasgrandes))
+indices_grandes
+```
+
+```{r}
+plot(dtb$en_vm_ponderado[-c(indices_grandes)], dtb$en_vm_ponderado[-c(indices_grandes)])
+```
+Se crea una dtb llamada toclust2 que contiene los datos sin los "outliers"
+
+```{r}
+toclust2 <- toclust[-c(1449,indices_grandes),]
+toclust2 <- scale(toclust2[, 2:length(toclust2)], center= TRUE, scale=TRUE)
+dist_toclust2 <- dist(toclust2)
+```
+
+```{r}
+corrplot(cor(toclust2))
+```
+```{r}
+hclust_test2 <- hclust(dist_toclust2)
+plot(hclust_test2)
+```
+```{r}
+cutree2 <- cutree(hclust_test2 , k = 10)
+```
+
+```{r}
+table(cutree2)
+```
+
+
