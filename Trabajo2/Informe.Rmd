@@ -1,0 +1,229 @@
+---
+title: "Segmentación para una base de datos simulada"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+suppressMessages(library(tidyverse))
+suppressMessages(library(ggplot2))
+suppressMessages(library(devtools))
+suppressMessages(library(ggbiplot))
+suppressMessages(library(corrplot))
+suppressMessages(library(caret))
+```
+Función auxiliar para transformar las variables:
+
+```{r}
+asignar <- function(fila){
+  return (ifelse(sum(fila)==0, 0, which(fila==max(fila))))
+}
+```
+
+Función auxiliar para segmentar:
+
+```{r}
+segmentar_fila <- function(fila, percentiles){
+  ## Segmenta una fila según el número de percentiles dados
+  
+  ## Argumentos:
+  ## fila: Una fila de datos
+  ## Percentiles: Percentiles por los cuales se quiere clasificar los datos
+  
+  ## Retorno
+  ## fila_segmentada: Fila segmentada por percentiles
+  
+  fila_segmentada = cut(fila, quantile(fila, probs = percentiles),
+                        include.lowest = TRUE, dig.lab = 999, labels = FALSE)
+  
+  return(as.numeric(fila_segmentada))
+}
+```
+
+
+
+## Lectura de la base de datos:
+
+```{r}
+dtb <- read.csv("base.csv", sep = ";")
+```
+
+### Canales preferidos:
+
+```{r}
+dtb <- dtb %>% mutate(en_vm_preferido=apply(dtb[2:12], 1, asignar)) %>% 
+  mutate(en_tx_preferido=apply(dtb[13:23], 1, asignar)) %>%
+  mutate(sal_vm_preferido=apply(dtb[24:27], 1, asignar)) %>%
+  mutate(sal_tx_preferido=apply(dtb[28:31], 1, asignar))
+```
+
+### Ponderación canales salientes:
+
+```{r}
+dtb <- dtb %>% mutate(en_vm_ponderado=segmentar_fila(rowSums(dtb[, 2:12])/11, percentiles = seq(0, 1 ,by=0.2))) %>% 
+  mutate(en_tx_ponderado = rowSums(dtb[, 13:23])/11) %>%
+  mutate(sal_vm_ponderado = rowSums(dtb[, 24:27])/4) %>%
+  mutate(sal_tx_ponderado = rowSums(dtb[, 28:31])/4)
+```
+
+
+### Pagos y recaudos PN y PJ
+
+```{r}
+dtb <- dtb %>% mutate(persona_pagos = as.numeric(dtb$pagos_pj > dtb$pagos_pn)) %>%
+  mutate(persona_recaudos = as.numeric(dtb$recaudos_pj > dtb$recaudos_pn))
+```
+
+### Categorización canales salientes:
+
+```{r}
+dtb <- dtb %>% mutate(en_vm_segmentado=segmentar_fila(rowSums(dtb[, 2:12])/11, percentiles = seq(0, 1 ,by=0.2))) %>% 
+  mutate(en_tx_segmentado = segmentar_fila(rowSums(dtb[, 13:23])/11, percentiles = seq(0, 1 ,by=0.2))) %>%
+  mutate(sal_vm_segmentado = segmentar_fila(rowSums(dtb[, 24:27])/4, percentiles = seq(0, 1 ,by=0.2))) %>%
+  mutate(sal_tx_segmentado = segmentar_fila(rowSums(dtb[, 28:31])/4, percentiles = seq(0, 1 ,by=0.2)))
+```
+
+
+
+## Reescalado de la base de datos:
+
+```{r}
+nits <- dtb[, "nit"]
+sin_escalar <- dtb
+dtb[, 2:length(dtb)] <- scale(dtb[, 2:length(dtb)], center = TRUE, scale = TRUE)
+scaled_dtb <-dtb[, 2:length(dtb)]
+```
+
+
+## Análisis descriptivo de los datos:
+
+```{r}
+correlations <- cor(scaled_dtb)
+corrplot(correlations)
+```
+
+```{r}
+dtb1 <- dtb[,2:31]
+corr1 <- cor(dtb1)
+corrplot(corr1)
+
+```
+
+
+```{r}
+dtb2 <- dtb[, 32:length(dtb)]
+corrplot(cor(dtb2))
+
+```
+
+
+## Análisis de componentes principales:
+
+```{r}
+dtb_pca <- princomp(dtb[2:length(dtb)])
+ggbiplot(dtb_pca) + ylim(-1,1) + xlim(-1,1)
+```
+Se observa un comportamiento más homógeneo en nuestros datos, aún así hace falta una variable que indique en qué intervalo de valores están nuestros datos.
+
+Observemos el comportamiento de los valores atípicos:
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(dtb$en_vm_ponderado[c(indices1)] , dtb$en_vm_ponderado[c(indices1)])
+plot(dtb$sal_vm_ponderado[c(indices2)], dtb$sal_vm_ponderado[c(indices2)])
+plot(dtb$en_tx_ponderado[c(indices3)], dtb$en_tx_ponderado[c(indices3)])
+plot(dtb$sal_tx_ponderado[c(indices4)], dtb$sal_tx_ponderado[c(indices4)])
+```
+
+Se observa que al utilizar el método de detección de outliers por medio de boxplots no se obtienen buenos resultados para detectar valores atípicos extremos.
+
+
+```{r}
+dist1 <- dist(dtb[, 2:length(dtb)])
+hclust1 <- hclust(dist1)
+```
+
+```{r}
+plot(hclust1)
+```
+
+
+```{r}
+cutress1 <- cutree(hclust1, k= 8)
+table(cutress1)
+```
+
+```{r}
+pca1 <- princomp(dtb[, 2:length(dtb)])
+ggbiplot(pca1,  xlim=c(-1,1), yliim=c(-1,1))
+```
+
+```{r}
+dtb_prueba2 <- dtb[, 32:length(dtb)]
+dtb_prueba2 <- dtb_prueba2[, -c(21:24)]
+```
+
+```{r}
+dist_prueba2 <- dist(dtb_prueba2)
+head(dist_prueba2)
+```
+
+```{r}
+clusters_prueba2 <- hclust(dist_prueba2)
+```
+
+```{r}
+plot(clusters_prueba2)
+```
+
+```{r}
+cutress2 <- cutree(clusters_prueba2, k= 4)
+table(cutress2)
+```
+
+```{r}
+grupo1 <- which((cutress2) ==1)
+summary(sin_escalar[grupo1, 32:length(dtb)])
+```
+
+```{r}
+grupo2 <- which((cutress2) ==2)
+summary(dtb_prueba2)
+```
+
+```{r}
+pca2 <- princomp(dtb_prueba2)
+ggbiplot(pca2, groups  = factor(cutress2))
+```
+
+```{r}
+sal_vm_boxplot <- ggplot(dtb, aes(x=cutress2, y = sal_vm_ponderado, color = factor(cutress2))) + geom_boxplot() + ylim(0, 5)
+sal_vm_boxplot
+```
+
+
+
+```{r}
+sal_tx_boxplot <- ggplot(dtb, aes(x=cutress2, y = sal_tx_ponderado, color = factor(cutress2))) + geom_boxplot() + ylim(0, 5)
+sal_tx_boxplot
+```
+
+
+```{r}
+en_vm_boxplot <- ggplot(dtb, aes(x=cutress2, y = en_vm_ponderado, color = factor(cutress2))) + geom_boxplot() 
+en_vm_boxplot
+```
+
+```{r}
+en_tx_boxplot <- ggplot(dtb, aes(x=cutress2, y = en_tx_ponderado, color = factor(cutress2))) + geom_boxplot() 
+en_tx_boxplot + ylim(0, 0.7)
+```
+
+```{r}
+corrplot(cor(dtb_prueba2))
+```
+
