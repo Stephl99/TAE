@@ -9,6 +9,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### Lectura de paquetes:
+
 ```{r}
 suppressMessages(library(tidyverse))
 suppressMessages(library(ggplot2))
@@ -17,35 +19,16 @@ suppressMessages(library(ggbiplot))
 suppressMessages(library(corrplot))
 suppressMessages(library(caret))
 ```
-Función auxiliar para transformar las variables:
+
+### Función auxiliar para transformar las variables:
+
+Creamos una función que nos de información acerca de cual columna es la preferida en un conjunto de filas.
 
 ```{r}
 asignar <- function(fila){
   return (ifelse(sum(fila)==0, 0, which(fila==max(fila))))
 }
 ```
-
-Función auxiliar para segmentar:
-
-```{r}
-segmentar_fila <- function(fila, percentiles){
-  ## Segmenta una fila según el número de percentiles dados
-  
-  ## Argumentos:
-  ## fila: Una fila de datos
-  ## Percentiles: Percentiles por los cuales se quiere clasificar los datos
-  
-  ## Retorno
-  ## fila_segmentada: Fila segmentada por percentiles
-  
-  fila_segmentada = cut(fila, quantile(fila, probs = percentiles),
-                        include.lowest = TRUE, dig.lab = 999, labels = FALSE)
-  
-  return(as.numeric(fila_segmentada))
-}
-```
-
-
 
 ## Lectura de la base de datos:
 
@@ -54,6 +37,8 @@ dtb <- read.csv("base.csv", sep = ";")
 ```
 
 ### Canales preferidos:
+
+Se aplica la función de asignar para extraer la información acerca de cuáles son los canales preferidos en la base de datos.
 
 ```{r}
 dtb <- dtb %>% mutate(en_vm_preferido=apply(dtb[2:12], 1, asignar)) %>% 
@@ -64,12 +49,7 @@ dtb <- dtb %>% mutate(en_vm_preferido=apply(dtb[2:12], 1, asignar)) %>%
 
 ### Ponderación canales salientes:
 
-```{r}
-# dtb <- dtb %>% mutate(en_vm_ponderado=segmentar_fila(rowSums(dtb[, 2:12])/11, percentiles = seq(0, 1 ,by=0.2))) %>% 
-#   mutate(en_tx_ponderado = segmentar_fila(rowSums(dtb[, 13:23])/11, percentiles = seq(0, 1 ,by=0.2))) %>%
-#   mutate(sal_vm_ponderado = segmentar_fila(rowSums(dtb[, 24:27])/4, percentiles = seq(0, 1 ,by=0.2))) %>%
-#   mutate(sal_tx_ponderado = segmentar_fila(rowSums(dtb[, 28:31])/4, percentiles = seq(0, 1 ,by=0.2)))
-```
+Se halla el promedio de los valores de cada fila en cada empresa en cada tipo de canal.
 
 ```{r}
 dtb <- dtb %>% mutate(en_vm_ponderado=rowSums(dtb[, 2:12])/11) %>% 
@@ -79,15 +59,25 @@ dtb <- dtb %>% mutate(en_vm_ponderado=rowSums(dtb[, 2:12])/11) %>%
 ```
 
 
+
 ### Pagos y recaudos PN y PJ
+
+Se crean dos variables binarias, para observar sí los pagos o recaudos fueron realizados en su mayoría para personas naturales o personas jurídicas.
 
 ```{r}
 dtb <- dtb %>% mutate(persona_pagos = as.numeric(dtb$pagos_pj > dtb$pagos_pn)) %>%
   mutate(persona_recaudos = as.numeric(dtb$recaudos_pj > dtb$recaudos_pn))
 ```
 
+## Copia de base de datos original para un futuro análisis descriptivo:
+
+```{r}
+saveRDS(dtb, "ori.rds")
+```
 
 ## Transformación logarítmica:
+
+Ya que las variables relacionadas con los movimientos en diversos canales bancarios son variables cuya escala es muy grande, además de que se presentan observaciones cuyos valores están muy alejados de los demás, una buena solución a esto para realizar un clustering jerárquico sería el aplicar la transformación logarítmica a los datos, esto se realizará acorde a cada canal.
 
 ```{r}
 dtb <- dtb[, c(1,32:length(dtb))]
@@ -95,12 +85,17 @@ indices <- (length(dtb)-2):(length(dtb)-5)
 dtb[, indices] <- log(dtb[, indices]+ 1) 
 ```
 
-## Reescalado de la base de datos y recoger "características":
+## Estándarización de la base de datos y recoger "características":
+
+Se estándariza la base de datos restando la media y dividiendo por la varianza, esto para evitar problemas de escala asociados a los datos.
 
 ```{r}
 dtb[, 2:length(dtb)] <- scale(dtb[, 2:length(dtb)], center = TRUE, scale = TRUE)
 ```
 
+## Gráfica de correlación de los datos:
+
+Se realiza una gráfica de correlación de los datos para hallar posibles relaciones entre las variables.
 
 ```{r}
 corrplot(cor(dtb[,2:length(dtb)]))
@@ -138,11 +133,47 @@ summary(pca_dtb)
 ```{r}
 ggbiplot(pca_dtb, group=factor(cortes))
 ```
+## Visualizaciones:
+
+### Lectura de base de datos original:
 
 ```{r}
-
+ori = readRDS("ori.RDS")
 ```
 
+### Precargue de los datos en ggplot:
+
+```{r}
+gg = ggplot(data = ori)
+```
+
+### Gráfico x contra x para ver el comportamiento de las ponderaciones:
+
+```{r}
+xx = gg + aes(x=en_vm_ponderado, y = en_vm_ponderado, color = factor(cortes)) 
+xx =  xx + geom_point() 
+xx + xlim(0,6e9) + ylim(0, 6e9)
+```
+
+```{r}
+xx + xlim(6e9, 1e10) + ylim(6e9,1e10)
+```
+
+
+### Boxplots para comparar el comportamiento de cada grupo en cada canal ponderado:
+
+```{r}
+require(gridExtra)
+p1 = gg + aes(x=factor(cortes), y=en_vm_ponderado) + geom_boxplot() + ylim(0, 9e9)
+p2 = gg + aes(x=factor(cortes), y=ori[, 53]) + geom_boxplot() + ylim(0, 500)
+p3 = gg + aes(x=factor(cortes), y=ori[, 54]) + geom_boxplot() 
+p4 = gg + aes(x=factor(cortes), y=ori[, 55]) + geom_boxplot() + ylim(0, 500)
+grid.arrange(p1,p2,p3,p4, ncol=2)
+```
+
+```{r}
+p3
+```
 
 
 
