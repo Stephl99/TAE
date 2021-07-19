@@ -1,0 +1,94 @@
+---
+title: "Experimento Categóricos"
+output: html_document
+---
+
+```{r}
+library(corrplot)
+library(ggbiplot)
+```
+## Creación de tablas de contingencia
+
+```{r}
+crearTabla <- function(variable1, variable2){
+  tabla <- table(variable1, variable2)
+  nueva_tabla <- as.data.frame(tabla)
+  grafica <- ggplot(data = nueva_tabla, mapping = aes(x=variable1, y=variable2, fill=Freq)) + geom_tile()
+  return(grafica + scale_fill_gradient2(low = "white",  high = "red"))
+}
+```
+
+## Lectura de los datos:
+
+```{r}
+categoricos <- readRDS("categoricos.RDS")
+```
+
+
+## Creación de nuevas variables:
+
+### Impo + expo:
+
+```{r}
+impo_expo <- categoricos$impo_cv + categoricos$expo_vt
+```
+
+### Cuentas por cobrar y pagar:
+
+```{r}
+cxpc <- categoricos$cxc + categoricos$cxp 
+```
+
+### Ventas físicas y electrónicas:
+
+```{r}
+tiene_ventas <- categoricos$tiene_ventas_electronicas + categoricos$tiene_ventas_fisicas
+```
+
+### Recaudos totales
+
+```{r}
+recaudos <- categoricos$recaudos_pj + categoricos$recaudos_pn
+```
+
+### Pagos totales
+```{r}
+pagos <- categoricos$pagos_pj + categoricos$pagos_pn
+```
+
+
+### Nueva base: 
+
+```{r}
+indices <- c( length(categoricos), 1:5,  length(categoricos)-5)
+names(categoricos)[indices]
+```
+```{r}
+reducida <- data.frame(categoricos[, indices], impo_expo, cxpc, tiene_ventas, recaudos, pagos)
+```
+
+```{r}
+correlaciones <- cor(reducida[, 2:length(reducida)])
+```
+
+```{r}
+corrplot(correlaciones)
+```
+
+```{r}
+correlaciones_originales <- cor(categoricos[, 1:length(categoricos)-1])
+corrplot(correlaciones_originales)
+```
+```{r}
+componentes1 <- prcomp(categoricos[, 1:length(categoricos)-1])  
+componentes2 <- prcomp(reducida[, 2:length(reducida)])
+```
+
+```{r}
+ggbiplot(componentes2)
+```
+```{r}
+crearTabla(reducida$ciclo_financiero, reducida$ciclo_negocio)
+```
+
+

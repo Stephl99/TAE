@@ -78,11 +78,7 @@ dtb <- dtb %>% mutate(persona_pagos = as.numeric(dtb$pagos_pj > dtb$pagos_pn)) %
   mutate(persona_recaudos = as.numeric(dtb$recaudos_pj > dtb$recaudos_pn))
 ```
 
-## Copia de base de datos original para un futuro análisis descriptivo:
 
-```{r}
-saveRDS(dtb, "ori.rds")
-```
 
 ## Transformación logarítmica:
 
@@ -92,6 +88,13 @@ Ya que las variables relacionadas con los movimientos en diversos canales bancar
 dtb <- dtb[, c(1,32:length(dtb))]
 indices <- (length(dtb)-2):(length(dtb)-5)
 dtb[, indices] <- log(dtb[, indices]+ 1) 
+```
+
+
+## Copia de base de datos original para un futuro análisis descriptivo:
+
+```{r}
+saveRDS(dtb, "ori.rds")
 ```
 
 ## categorización de variables:
@@ -123,6 +126,7 @@ corrplot(cor(dtb[,2:length(dtb)]))
 ### Intento de clustering jerarquico
 
 ```{r}
+indices2 <- c(indices, 18:21)
 distancias <- dist(dtb[, indices2])
 clusters <- hclust(distancias)
 ```
@@ -167,41 +171,20 @@ gg = ggplot(data = ori)
 
 ```{r}
 require(gridExtra)
-p1 = gg + aes(x=factor(cortes), y=en_vm_ponderado) + geom_boxplot() + ylim(0,1.5e9)
-p2 = gg + aes(x=factor(cortes), y=ori[, 53]) + geom_boxplot() + ylim(0,2e2)
-p3 = gg + aes(x=factor(cortes), y=ori[, 54]) + geom_boxplot() +ylim(0,1e9)
-p4 = gg + aes(x=factor(cortes), y=ori[, 55]) + geom_boxplot() +ylim(0,2e2)
+p1 = gg + aes(x=factor(cortes), y=en_vm_ponderado) + geom_boxplot()
+p2 = gg + aes(x=factor(cortes), y=sal_vm_ponderado) + geom_boxplot() 
+p3 = gg + aes(x=factor(cortes), y=en_tx_ponderado) + geom_boxplot() 
+p4 = gg + aes(x=factor(cortes), y=sal_tx_ponderado) + geom_boxplot() 
 grid.arrange(p1,p2,p3,p4, ncol=2)
 ```
 
 ```{r}
-p3 = gg + aes(x=factor(cortes), y=ori[, 54]) + geom_boxplot() +ylim(0,1e9)
-p3
+grupo1 <- ori[which(cortes==1), ]
+grupo2 <- ori[which(cortes==2), ]
+grupo3 <- ori[which(cortes==3), ]
+grupo4 <- ori[which(cortes==4), ]
 ```
 
-
-```{r}
-grupo1 <- dtb[which(cortes==1), ]
-grupo2 <- dtb[which(cortes==2), ]
-grupo3 <- dtb[which(cortes==3), ]
-grupo4 <- dtb[which(cortes==4), ]
-```
-
-```{r}
-summary(grupo1)
-```
-
-```{r}
-summary(grupo2)
-```
-
-```{r}
-summary(grupo3)
-```
-
-```{r}
-summary(grupo4)
-```
 
 ```{r}
 grupos <- list(grupo1, grupo2,grupo3, grupo4)
@@ -219,18 +202,21 @@ for(grupo in grupos){
 }
 ```
 
+
 ```{r}
-sal_tx_preferidos
-```
-```{r}
-sal_vm_preferidos
-```
-```{r}
-en_vm_preferidos
+
+p1 = ggplot(data = grupo1, aes(x=en_vm_preferido)) +geom_bar()
+p2 = ggplot(data = grupo2, aes(x=en_vm_preferido)) +geom_bar()
+p3 = ggplot(data = grupo3, aes(x=en_vm_preferido)) +geom_bar()
+p4 = ggplot(data = grupo4, aes(x=en_vm_preferido)) +geom_bar()
+grid.arrange(p1,p2,p3,p4, ncol=2)
 ```
 
 ```{r}
-en_tx_preferidos
+p1 = ggplot(data = grupo1, aes(x=en_vm_ponderado)) +geom_histogram()
+p2 = ggplot(data = grupo2, aes(x=en_vm_ponderado)) +geom_histogram()
+p3 = ggplot(data = grupo3, aes(x=en_vm_ponderado)) +geom_histogram()
+p4 = ggplot(data = grupo4, aes(x=en_vm_ponderado)) +geom_histogram()
+grid.arrange(p1,p2,p3,p4, ncol=2)
 ```
-
 
