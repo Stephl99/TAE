@@ -1,0 +1,70 @@
+---
+title: "Característica"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+numericos <- readRDS("numericos.RDS")
+nits <- numericos$nit
+numericos <- numericos[, -1]
+```
+
+
+```{r}
+numericos <- log(numericos + 1)
+numericos <- as.data.frame(numericos)
+```
+
+
+```{r}
+gg <- ggplot(data = numericos)
+```
+
+```{r}
+variables_salientes_vm <- grepl("sal_vm", names(numericos))
+variables_salientes_tx <- grepl("sal_tx", names(numericos))
+nombres_salientes <- names(numericos)[variables_salientes_vm |
+                                      variables_salientes_tx]
+nombres_entrantes <- str_replace(nombres_salientes, "sal", "en")
+
+```
+
+
+```{r}
+caracteristicas <- list()
+for(i in 1:length(nombres_salientes)){
+  distancias <- dist(numericos[, nombres_entrantes[i]],
+                     numericos[, nombres_salientes[i]] , method = "euclidean")
+  clusters <- hclust(distancias)
+  grupos <- cutree(clusters, k=2)
+  caracteristicas[[paste0("saliente_entrante", i)]] = grupos
+}
+```
+
+
+```{r}
+caracteristicas <- as.data.frame(caracteristicas)
+```
+
+
+```{r}
+library(ggbiplot)
+```
+
+```{r}
+distancias_grupales <- dist(caracteristicas)
+cluster_grupal <- hclust(distancias_grupales)
+grupos <- cutree(cluster_grupal, k = 2)
+table(grupos)
+```
+
+```{r}
+pca_prueba <- prcomp(caracteristicas)
+ggbiplot(pca_prueba, groups = factor(grupos))
+```
+
