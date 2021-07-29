@@ -2,69 +2,141 @@
 title: "Característica"
 output: html_document
 ---
-
-```{r}
-library(tidyverse)
-```
-
-
-```{r}
-numericos <- readRDS("numericos.RDS")
-nits <- numericos$nit
-numericos <- numericos[, -1]
-```
-
-
-```{r}
-numericos <- log(numericos + 1)
-numericos <- as.data.frame(numericos)
-```
-
-
-```{r}
-gg <- ggplot(data = numericos)
-```
-
-```{r}
-variables_salientes_vm <- grepl("sal_vm", names(numericos))
-variables_salientes_tx <- grepl("sal_tx", names(numericos))
-nombres_salientes <- names(numericos)[variables_salientes_vm |
-                                      variables_salientes_tx]
-nombres_entrantes <- str_replace(nombres_salientes, "sal", "en")
-
-```
-
-
-```{r}
-caracteristicas <- list()
-for(i in 1:length(nombres_salientes)){
-  distancias <- dist(numericos[, nombres_entrantes[i]],
-                     numericos[, nombres_salientes[i]] , method = "euclidean")
-  clusters <- hclust(distancias)
-  grupos <- cutree(clusters, k=2)
-  caracteristicas[[paste0("saliente_entrante", i)]] = grupos
-}
-```
-
-
-```{r}
-caracteristicas <- as.data.frame(caracteristicas)
-```
-
-
+## Funciones creadas para el problema:
 ```{r}
 library(ggbiplot)
 ```
-
+### Contar los na de una columna
 ```{r}
-distancias_grupales <- dist(caracteristicas)
-cluster_grupal <- hclust(distancias_grupales)
-grupos <- cutree(cluster_grupal, k = 2)
-table(grupos)
+conteo <- function(columna){
+  return(sum(is.na(columna)))
+}
+```
+### Reescalado min/max
+```{r}
+min_max <- function(columna){
+  columna <- (columna-min(columna))/(max(columna)-min(columna))
+  return(columna)
+}
+```
+### Lectura de paquetes:
+```{r}
+library(tidyverse)
+library(naniar)
+```
+### Cargar Base de datos:
+```{r}
+base <- readRDS("numericos.RDS")
+nits <- base$nit
+base <- base[, -1]
+original <- base
+summary(original$en_tx_canal5)
+```
+# PIPELINE
+## Preprocesar
+###Convertir los valores que son 0 a NA
+```{r}
+base <- log(base+1)
+```
+```{r}
+base <- lapply(base, min_max)
+base <- as.data.frame(base)
+```
+```{r}
+base[base==0] <- NA
+```
+### Visualizar los NA
+```{r}
+valores <- apply(FUN = conteo, base, MARGIN = 2)
+nombresNA <-names(sort(valores))
+base <- base[, nombresNA]
+```
+```{r}
+vis_miss(base)
+```
+```{r}
+base[is.na(base)] <- 0
+```
+### Convertir valores en variables poco usadas que no son 0 en 1
+```{r}
+base[19:30][base[19:30] > 0] = 1
+```
+
+## Kmeans
+```{r}
+set.seed(280721)
+training <- base[1:18]
+wcss <- vector()
+for(i in 1:15){
+  wcss[i] <- sum(kmeans(training, i)$withinss)
+}
 ```
 
 ```{r}
-pca_prueba <- prcomp(caracteristicas)
-ggbiplot(pca_prueba, groups = factor(grupos))
+plot(wcss, type = "ol")
 ```
+
+```{r}
+set.seed(280721)
+kmeans <- kmeans(training, 4, iter.max =1000, nstart = 10)
+```
+
+```{r}
+clusters <- kmeans$cluster
+```
+
+
+
+```{r}
+pca_training <- prcomp(base[1:18])
+ggbiplot(pca_training, groups = factor(clusters ) )
+```
+### KMEANS
+```{r}
+original[base == 0] <- NA
+grupo1 <- original[which(clusters == 1), ]
+grupo2 <- original[which(clusters == 2), ]
+grupo3 <- original[which(clusters == 3), ]
+grupo4 <- original[which(clusters == 4), ]
+```
+
+```{r}
+puntero <- original$en_vm_canal2
+
+indices <- which( puntero < quantile(puntero, 0.95, na.rm = TRUE))
+puntero <- puntero[indices] 
+e <- ggplot(as.data.frame(puntero), aes(x=factor(clusters[indices]), y = puntero))
+e + geom_boxplot()
+```
+Se observa que en cada grupo se presenta un comportamiento diferente entre cada canal
+## Describir
+###Describir cada cluster
+###Sí da el tiempo usar cada cluster como variables respuesta y de ahí evaluar sí el resultado fue el deseado mediante un modelo sencillo
+## Hallar valores plausibles
+
+
+## Numericas:
+
+* 0's a NA's
+* Acotar el máximo (Las más grandes tratar como otra población)
+
+## Preprocesar a 0-1 (Max-min)
+
+## Categóricas:
+
+* Target-Encoder
+
+## Algorítmicas
+
+* DBSCAN
+* KNN
+* UMAP
+
+## Agregar labels:
+
+* Análisis descriptivo, asumiendo que label es una etiqueta real y crear un modelo sencillo como knn para etiquetar una posible observación nueva.
+
+
+
+
 
