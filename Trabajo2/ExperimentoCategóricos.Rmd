@@ -8,7 +8,6 @@ library(corrplot)
 library(ggbiplot)
 ```
 ## Creación de tablas de contingencia
-
 ```{r}
 crearTabla <- function(variable1, variable2){
   tabla <- table(variable1, variable2)
@@ -25,12 +24,49 @@ categoricos <- readRDS("categoricos.RDS")
 ```
 
 
+```{r}
+table(categoricos$impo_cv[which(clusters==1)])
+table(categoricos$impo_cv[which(clusters==2)])
+
+table(categoricos$impo_cv[which(clusters==3)])
+
+table(categoricos$impo_cv[which(clusters==4)])
+
+```
+
+```{r}
+categoricos <- select(categoricos, -pagos_pj)
+```
+
+
+```{r}
+correlacion_original <- cor(categoricos[ , -length(categoricos)]) 
+corrplot(correlacion_original)
+```
+
 ## Creación de nuevas variables:
 
 ### Impo + expo:
 
+
 ```{r}
-impo_expo <- categoricos$impo_cv + categoricos$expo_vt
+crearTabla(categoricos$impo_cv, categoricos$expo_vt)
+```
+```{r}
+table(categoricos$expo_vt, categoricos$impo_cv)
+
+```
+
+```{r}
+prueba <- select(categoricos, impo_cv, expo_vt)
+pivot_longer(prueba, names_to = c("impo_cv", "expo_vt"))
+barplot(prueba)
+
+```
+
+
+```{r}
+impo_expo <- categoricos$impo_cv -  categoricos$expo_vt
 ```
 
 ### Cuentas por cobrar y pagar:
@@ -57,38 +93,15 @@ pagos <- categoricos$pagos_pj + categoricos$pagos_pn
 ```
 
 
-### Nueva base: 
-
 ```{r}
-indices <- c( length(categoricos), 1:5,  length(categoricos)-5)
-names(categoricos)[indices]
-```
-```{r}
-reducida <- data.frame(categoricos[, indices], impo_expo, cxpc, tiene_ventas, recaudos, pagos)
+pca_cate <- prcomp(select(categoricos, -nit))
+ggbiplot(pca_cate)
 ```
 
-```{r}
-correlaciones <- cor(reducida[, 2:length(reducida)])
-```
 
 ```{r}
-corrplot(correlaciones)
-```
+datos <- pca_cate$rotation
 
-```{r}
-correlaciones_originales <- cor(categoricos[, 1:length(categoricos)-1])
-corrplot(correlaciones_originales)
-```
-```{r}
-componentes1 <- prcomp(categoricos[, 1:length(categoricos)-1])  
-componentes2 <- prcomp(reducida[, 2:length(reducida)])
-```
-
-```{r}
-ggbiplot(componentes2)
-```
-```{r}
-crearTabla(reducida$ciclo_financiero, reducida$ciclo_negocio)
 ```
 
 

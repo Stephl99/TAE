@@ -11,6 +11,11 @@ library(ggbiplot)
 conteo <- function(columna){
   return(sum(is.na(columna)))
 }
+segmentar_columna <- function(columna, percentiles){
+  nueva <- columna 
+  nueva[nueva >0] <- findInterval(nueva[nueva>0], quantile(columna, percentiles)) + 1
+  return(nueva)
+}
 ```
 ### Reescalado min/max
 ```{r}
@@ -57,15 +62,22 @@ vis_miss(base)
 ```{r}
 base[is.na(base)] <- 0
 ```
+
+
 ### Convertir valores en variables poco usadas que no son 0 en 1
 ```{r}
 base[19:30][base[19:30] > 0] = 1
 ```
-
+###
+```{r}
+base[1:18] <- lapply(base[1:18], segmentar_columna, 
+                     percentiles = seq(0.1, 1, by = 0.1))
+base <- as.data.frame(base)
+```
 ## Kmeans
 ```{r}
 set.seed(280721)
-training <- base[1:18]
+training <- base
 wcss <- vector()
 for(i in 1:15){
   wcss[i] <- sum(kmeans(training, i)$withinss)
@@ -92,8 +104,14 @@ pca_training <- prcomp(base[1:18])
 ggbiplot(pca_training, groups = factor(clusters ) )
 ```
 ### KMEANS
+
 ```{r}
-original[base == 0] <- NA
+base$clusters <- clusters
+table(clusters)
+```
+
+```{r}
+original[original == 0] <- NA
 grupo1 <- original[which(clusters == 1), ]
 grupo2 <- original[which(clusters == 2), ]
 grupo3 <- original[which(clusters == 3), ]
@@ -101,13 +119,12 @@ grupo4 <- original[which(clusters == 4), ]
 ```
 
 ```{r}
-puntero <- original$en_vm_canal2
-
-indices <- which( puntero < quantile(puntero, 0.95, na.rm = TRUE))
-puntero <- puntero[indices] 
-e <- ggplot(as.data.frame(puntero), aes(x=factor(clusters[indices]), y = puntero))
-e + geom_boxplot()
+table(base$sal_vm_otros[base$clusters == 1])
+table(base$sal_vm_otros[base$clusters == 2])
+table(base$sal_vm_otros[base$clusters == 3])
+table(base$sal_vm_otros[base$clusters == 4])
 ```
+
 Se observa que en cada grupo se presenta un comportamiento diferente entre cada canal
 ## Describir
 ###Describir cada cluster
