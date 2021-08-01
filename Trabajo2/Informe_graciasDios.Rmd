@@ -34,6 +34,7 @@ library(naniar)
 library(ggridges)
 library(GGally)
 library(viridis)
+library(corrplot)
 ```
 
 ## Integrantes
@@ -115,18 +116,13 @@ crearTabla <- function(variable1, variable2){
 segmentar_columna <- function(columna, percentiles){
   nueva <- columna 
   nueva[nueva >0] <- findInterval(nueva[nueva>0], 
-                                  quantile(columna[columna >0], percentiles)) 
+                                  quantile(columna[columna >0], percentiles),
+                                  all.inside = TRUE) 
   return(nueva)
 }
 ```
 
-```{r}
-promedio_entrantes_tx[is.na(promedio_entrantes_tx)] <- 0
-evaluacion <- promedio_entrantes_tx
-resultado <- segmentar_columna(promedio_entrantes_tx, seq(0.1, 1, by= 0.1))
-(cuantiles <- quantile(promedio_entrantes_tx, seq(0.1, 1, by= 0.1)))
-evaluar <- data.frame(resultado, promedio_entrantes_tx)
-```
+
 
 ## Lectura de la base de datos
 
@@ -180,31 +176,40 @@ caracteristicas <- log(caracteristicas + 1)
 ```
 
 ```{r}
-caracteristicas[1:4] <- apply(caracteristicas[1:4], MARGIN = 2, segmentar_columna, percentiles = seq(0.1, 1, by = 0.1))
+caracteristicas[1:4] <- apply(caracteristicas[1:4], MARGIN = 2, segmentar_columna, percentiles = seq(0, 1, by = 0.1))
 ```
 
-### 2. Rescalamiento Min-Max
 
-Ahora, para obtener una medida más robusta usando un algoritmo de clustering como KNN se aplica rescaliento min/max en las variables:
-
-```{r}
-caracteristicas <- lapply(caracteristicas, min_max)
-caracteristicas <- as.data.frame(caracteristicas)
-kable(summary(caracteristicas[,1:4]))
-```
-
-### 3. Análisis de uso de los canales:
+### 2. Análisis de uso de los canales:
 
 Ya que un valor de 0 en cada transacción significa que no hubieron transacciones en un canal, se analiza el comportamiento de las transacciones realizadas por cada empresa, para encontrar cuales son canales más o menos frecuentados:
 
 ```{r}
 base[1:30][base[1:30]==0] <- NA
 vis_miss(base[1:30], sort_miss = TRUE)
+```
+A partir de la gráfica se observa que existen canales en donde menos del 30% de las empresas realizan transacciones, por lo que se sugiere la creación de una variable
+llamada poco_frecuentados, que indique sí se utilizaron aquellos canales que tuvieron
+muy poco uso:
 
+```{r}
+# Se calcula el porcentaje de valores faltantes en cada canal:
+poco_frecuentados <- apply(base[1:30], MARGIN = 2, FUN = conteo)/2233
+# Se seleccionan los canales cuyo uso es menor o igual al 30 %
+poco_frecuentados <- poco_frecuentados[poco_frecuentados > 0.7]
+poco_frecuentados <- names(poco_frecuentados)
 # Aqui los conteo_nas NA vuelven a ser cero
 base[is.na(base)] <- 0
+# Se crea un vector llamado poco_frecuentados que condensa la información de los canales poco frecuentados
+poco_frecuentados <- apply(base[poco_frecuentados], MARGIN = 1, mean)
+poco_frecuentados[poco_frecuentados > 0] <- 1
+head(poco_frecuentados)
 ```
-A partir de la gráfica se observa que existen canales en donde menos del 30% de las empresas realizan transacciones.
+
+```{r}
+table(poco_frecuentados)
+```
+
 
 ## Variables categóricas
 
@@ -248,6 +253,7 @@ Las demás variables, al ser ya categorizadas se dejarán tal y cómo están.
 ## Agrupamiento de variables:
 
 
+
 ```{r}
 nombres_categoricas <- names(base[31:length(base)])
 nombres <- grepl("recaudos|pagos|tiene", nombres_categoricas)
@@ -256,15 +262,11 @@ nombres_categoricas <- nombres_categoricas[!nombres]
 
 ```{r}
 caracteristicas <- cbind(caracteristicas, base[nombres_categoricas], pagos_pn,
-                         tiene_ventas, recaudos)
+                         tiene_ventas, recaudos, poco_frecuentados)
 ```
 
 
 
-```{r}
-correlaciones_caracteristicas <- cor(caracteristicas)
-corrplot(correlaciones_caracteristicas)
-```
 
 ```{r}
 componentes <- prcomp(caracteristicas)
@@ -272,7 +274,7 @@ ggbiplot(componentes)
 ```
 
 
-```{r, fig.align='center', out.width='70%'}
+```{r}
 set.seed(280721)
 wcss <- vector()
 for(i in 1:15){
@@ -281,10 +283,11 @@ for(i in 1:15){
 plot(wcss, type = "ol")
 ```
 
+
 ```{r, fig.align='center', out.width='70%}
 set.seed(280721)
-kmeans <- kmeans(caracteristicas, 5, iter.max =1000, nstart = 10)
-clusters <- kmeans$cluster
+kmeans_datos <- kmeans(caracteristicas, 4, iter.max =1000, nstart = 10)
+clusters <- kmeans_datos$cluster
 ggbiplot(componentes, groups = factor(clusters ) )
 ```
 
@@ -307,6 +310,7 @@ table(grupo1$promedio_entrantes_tx)
 table(grupo2$promedio_entrantes_tx)
 table(grupo3$promedio_entrantes_tx)
 table(grupo4$promedio_entrantes_tx)
+table(grupo5$promedio_entrantes_tx)
 ```
 ```{r}
 table(grupo1$promedio_salientes_tx)
@@ -348,5 +352,20 @@ valores <- componentes$x
 valores <- as.data.frame(valores)
 valores$clusters <- clusters
 ggplot(valores, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) + geom_point()
+```
+
+```{r}
+table(grupo1$poco_frecuentados)
+table(grupo2$poco_frecuentados)
+table(grupo3$poco_frecuentados)
+table(grupo4$poco_frecuentados)
+table(grupo5$poco_frecuentados)
+```
+```{r}
+table(grupo1$ciclo_negocio)
+table(grupo2$ciclo_negocio)
+table(grupo3$ciclo_negocio)
+table(grupo4$ciclo_negocio)
+table(grupo5$ciclo_negocio)
 ```
 
