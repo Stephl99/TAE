@@ -329,7 +329,7 @@ Se considera elegir un número óptimo de clusters con k=4.
 
 ```{r}
 set.seed(280721)
-kmeans_datos <- kmeans(caracteristicas, 5, iter.max =1000, nstart = 10)
+kmeans_datos <- kmeans(caracteristicas, 4, iter.max =1000, nstart = 10)
 clusters <- kmeans_datos$cluster
 valores_componentes$clusters <- clusters
 ggplot(valores_componentes, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) + geom_point()
@@ -350,7 +350,6 @@ grupo1 <- caracteristicas[clusters == 1,]
 grupo2 <- caracteristicas[clusters == 2,]
 grupo3 <- caracteristicas[clusters == 3,]
 grupo4 <- caracteristicas[clusters == 4,]
-grupo5 <- caracteristicas[clusters == 5,]
 ```
 
 
