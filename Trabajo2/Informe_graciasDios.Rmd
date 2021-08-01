@@ -2,7 +2,9 @@
 title: "Informee"
 author: "Stephany Michell Lobo Laguado"
 date: "30/7/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +30,6 @@ library(dplyr)
 library(MASS)
 library(caret)
 library(caTools)
-library(ggbiplot)
 library(tidyverse)
 library(naniar)
 library(ggridges)
@@ -252,7 +253,7 @@ Las demás variables, al ser ya categorizadas se dejarán tal y cómo están.
 
 ## Agrupamiento de variables:
 
-
+Se agregan las demás variables categóricas a la base de características ya que al ser variables previamente categorizadas no sería consistente encontrar relaciones entre ellas ya que se desconoce su parte númerica.
 
 ```{r}
 nombres_categoricas <- names(base[31:length(base)])
@@ -265,14 +266,12 @@ caracteristicas <- cbind(caracteristicas, base[nombres_categoricas], pagos_pn,
                          tiene_ventas, recaudos, poco_frecuentados)
 ```
 
-
-
-
 ```{r}
-componentes <- prcomp(caracteristicas)
-ggbiplot(componentes)
+componetes_principales <- prcomp(caracteristicas)
+valores_componentes <- componetes_principales$x
+valores_componentes<- as.data.frame(valores_componentes)
+ggplot(valores_componentes, aes(x = PC1, y = PC2) ) + geom_point()
 ```
-
 
 ```{r}
 set.seed(280721)
@@ -284,11 +283,12 @@ plot(wcss, type = "ol")
 ```
 
 
-```{r, fig.align='center', out.width='70%}
+```{r}
 set.seed(280721)
-kmeans_datos <- kmeans(caracteristicas, 4, iter.max =1000, nstart = 10)
+kmeans_datos <- kmeans(caracteristicas, 5, iter.max =1000, nstart = 10)
 clusters <- kmeans_datos$cluster
-ggbiplot(componentes, groups = factor(clusters ) )
+valores_componentes$clusters <- clusters
+ggplot(valores_componentes, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) + geom_point()
 ```
 
 
@@ -310,35 +310,30 @@ table(grupo1$promedio_entrantes_tx)
 table(grupo2$promedio_entrantes_tx)
 table(grupo3$promedio_entrantes_tx)
 table(grupo4$promedio_entrantes_tx)
-table(grupo5$promedio_entrantes_tx)
 ```
 ```{r}
 table(grupo1$promedio_salientes_tx)
 table(grupo2$promedio_salientes_tx)
 table(grupo3$promedio_salientes_tx)
 table(grupo4$promedio_salientes_tx)
-table(grupo5$promedio_salientes_tx)
 ```
 ```{r}
 table(grupo1$promedio_entrantes_vm)
 table(grupo2$promedio_entrantes_vm)
 table(grupo3$promedio_entrantes_vm)
 table(grupo4$promedio_entrantes_vm)
-table(grupo5$promedio_entrantes_vm)
 ```
 ```{r}
 table(grupo1$promedio_salientes_vm)
 table(grupo2$promedio_salientes_vm)
 table(grupo3$promedio_salientes_vm)
 table(grupo4$promedio_salientes_vm)
-table(grupo5$promedio_salientes_vm)
 ```
 ```{r}
 table(grupo1$recaudos)
 table(grupo2$recaudos)
 table(grupo3$recaudos)
 table(grupo4$recaudos)
-table(grupo5$recaudos)
 ```
 
 ```{r}
@@ -348,24 +343,15 @@ ggplot(caracteristicas, aes(y = pagos_pn, group= clusters)) + geom_boxplot()
 
 
 ```{r}
-valores <- componentes$x
-valores <- as.data.frame(valores)
-valores$clusters <- clusters
-ggplot(valores, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) + geom_point()
-```
-
-```{r}
 table(grupo1$poco_frecuentados)
 table(grupo2$poco_frecuentados)
 table(grupo3$poco_frecuentados)
 table(grupo4$poco_frecuentados)
-table(grupo5$poco_frecuentados)
 ```
 ```{r}
 table(grupo1$ciclo_negocio)
 table(grupo2$ciclo_negocio)
 table(grupo3$ciclo_negocio)
 table(grupo4$ciclo_negocio)
-table(grupo5$ciclo_negocio)
 ```
 
