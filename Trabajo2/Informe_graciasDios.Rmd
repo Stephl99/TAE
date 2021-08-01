@@ -3,8 +3,8 @@ title: "Informee"
 author: "Stephany Michell Lobo Laguado"
 date: "30/7/2021"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -36,6 +36,8 @@ library(ggridges)
 library(GGally)
 library(viridis)
 library(corrplot)
+library(kableExtra)
+library(printr)
 ```
 
 ## Integrantes
@@ -96,7 +98,9 @@ Hay hasta 10 distintos canales en los que se realizan acciones de entrada y sali
 
 ## Funciones de Usuario
 
-```{r}
+Estas funciones fueron creadas con el fin de depurar la base de datos realizando conteo de valores faltantes, reescalamiento de variables y nuevas variables.
+
+```{r b}
 conteo <- function(columna){
         ### Contar los na de una columna
   return(sum(is.na(columna)))
@@ -127,7 +131,7 @@ segmentar_columna <- function(columna, percentiles){
 
 ## Lectura de la base de datos
 
-```{r}
+```{r c}
 base <- read.csv("base.csv", sep =";")
 nits <- base$nit
 base <- base[-1]
@@ -139,10 +143,10 @@ base <- base[-1]
 
 ## Promedio de las respectivas transacciones en la base:
 
-Se crean variables correspondientes al promedio de las transacciones diferentes en cada canal. Ya que cada entrada correspondiente a las transacciones representa la cantidad en promedio que se maneja de una transacción, se tiene que un 0 en la base de datos significa que no hubieron transacciones en ese respectivo canal. Por lo que se cálcula el promedio de las transacciones que fueron mayores a 0, y el valor de 0 indica que no se hizo ninguna transacción de la que se intenta promediar.
+Se crean variables correspondientes al promedio de las transacciones diferentes en cada canal. Ya que cada entrada correspondiente a las transacciones representa la cantidad en promedio que se maneja de una transacción, se tiene que un 0 en la base de datos significa que no hubo transacciones en ese respectivo canal. Por lo que se cálcula el promedio de las transacciones que fueron mayores a 0, y el valor de 0 indica que no se hizo ninguna transacción de la que se intenta promediar.
 
 Se toma el nombre de las variables correspondientes a cada transacción:
-```{r}
+```{r d}
 salientes_tx <- grepl("sal_tx", names(base))
 salientes_vm <- grepl("sal_vm", names(base))
 entrantes_tx <- grepl("en_tx", names(base))
@@ -150,21 +154,21 @@ entrantes_vm <- grepl("en_vm", names(base))
 ```
 
 Se convierten los 0's a NA para poder aplicar un apply en las filas y se extrae la cantidad de NA's en cada fila para estudiar el uso de cada canal:
-```{r}
+```{r e}
 base[1:30][base[1:30] == 0] <- NA
 conteo_nas <- apply(FUN = conteo, base, MARGIN = 2)
 ```
 
-Se crean variables nuevas que corresponden al promedio en cada transacción:
-```{r}
+Se crean variables nuevas las cuales corresponden al promedio en cada transacción:
+```{r f}
 promedio_salientes_tx <- apply(base[salientes_tx], MARGIN = 1, mean, na.rm = TRUE)
 promedio_salientes_vm <- apply(base[salientes_vm], MARGIN = 1, mean, na.rm = TRUE)
 promedio_entrantes_tx <- apply(base[entrantes_tx], MARGIN = 1, mean, na.rm = TRUE)
 promedio_entrantes_vm <- apply(base[entrantes_vm], MARGIN = 1, mean, na.rm = TRUE)
 ```
 
-Se crea un dataframe con las características encontradas en la base de datos:
-```{r}
+Se crea un dataframe con las características encontradas en la base de datos y a cada valor faltante se le asigna un 0:
+```{r g}
 caracteristicas <- data.frame(promedio_entrantes_tx, promedio_salientes_vm,
                    promedio_salientes_tx, promedio_entrantes_vm)
 caracteristicas[is.na(caracteristicas)] <-0
@@ -172,28 +176,27 @@ caracteristicas[is.na(caracteristicas)] <-0
 
 Ya que se tienen distancias muy grandes entre observaciones, una medida que puede hacer que las distancias entre las observaciones sea más robusta es la transformación logarítmica:
 
-```{r}
+```{r h}
 caracteristicas <- log(caracteristicas + 1)
 ```
 
-```{r}
+```{r j}
 caracteristicas[1:4] <- apply(caracteristicas[1:4], MARGIN = 2, segmentar_columna, percentiles = seq(0, 1, by = 0.1))
 ```
 
 
 ### 2. Análisis de uso de los canales:
 
-Ya que un valor de 0 en cada transacción significa que no hubieron transacciones en un canal, se analiza el comportamiento de las transacciones realizadas por cada empresa, para encontrar cuales son canales más o menos frecuentados:
+Ya que un valor de 0 en cada transacción significa que no hubo transacciones en un canal, se analiza el comportamiento de las transacciones realizadas por cada empresa, para encontrar cuales son canales más o menos frecuentados:
 
-```{r}
+```{r k}
 base[1:30][base[1:30]==0] <- NA
 vis_miss(base[1:30], sort_miss = TRUE)
 ```
 A partir de la gráfica se observa que existen canales en donde menos del 30% de las empresas realizan transacciones, por lo que se sugiere la creación de una variable
-llamada poco_frecuentados, que indique sí se utilizaron aquellos canales que tuvieron
-muy poco uso:
+llamada poco_frecuentados, que indique sí se utilizaron aquellos canales que tuvieron muy poco uso:
 
-```{r}
+```{r l}
 # Se calcula el porcentaje de valores faltantes en cada canal:
 poco_frecuentados <- apply(base[1:30], MARGIN = 2, FUN = conteo)/2233
 # Se seleccionan los canales cuyo uso es menor o igual al 30 %
@@ -207,28 +210,52 @@ poco_frecuentados[poco_frecuentados > 0] <- 1
 head(poco_frecuentados)
 ```
 
-```{r}
-table(poco_frecuentados)
+```{r m}
+poco <- as.data.frame(poco_frecuentados) %>% 
+  count(poco_frecuentados) %>% 
+  rename(uso_canal = poco_frecuentados, cuenta=n)
 ```
 
+```{r n}
+kable(poco)
+```
+
+```{r o}
+ggplot(data = as.data.frame(poco_frecuentados)) + 
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) +
+  ggtitle("Gráfica canales poco usados") +
+  xlab("Canales poco frecuentes utilizados 0: no - 1: si")
+```
+
+Como se evidencia en la gráfica y en la tabla de frecuencia, se puede observar que cerca de 1213 clientes de la base de datos NO utilizan los canales poco frecuentados, comparado frente a 1020 clientes que sí lo hacen.
 
 ## Variables categóricas
 
 ### Recaudos:
 
-Se observa que la mayoría de las empresas no hicieron recaudos, por lo que se crea la variable Recaudos para indicar, qué empresas hicieron o no recaudos.
+Realizando un análisis descriptivo previo se encontró que la mayoría de las empresas no hicieron recaudos, por lo que se crea la variable Recaudos para indicar qué empresas hicieron o no recaudos.
 
-```{r}
+```{r p}
 recaudos <- grepl("recaudo", names(base))
 recaudos <- apply(base[recaudos], MARGIN = 1, mean)
 recaudos[recaudos > 0 ] <- 1
-ggplot(data.frame(recaudos), aes(x = recaudos)) + geom_bar()
+ggplot(data.frame(recaudos), aes(x = as.factor(recaudos))) + geom_bar() +
+ggtitle("Empresas y realización de recaudos") +
+xlab("recaudos")
 ```
 ### Pagos
 
-En la matriz de correlación de las variables, se encuentra una alta correlación entre las variables pagos_pn y pagos_pj. Al observar su comportamiento se encuentra que una variable explica la otra, por lo que se considera solamente utilizar una sola variable:
+Se procede a hallar la matriz de correlación entre los pagos a personas juridicas y los pagos a personas naturales:
 
-```{r}
+```{r bb}
+pagos <- grepl("pagos", names(base))
+correlaciones_pagos <- cor(base[pagos])
+corrplot(correlaciones_pagos, method = "number")
+```
+
+En la matriz de correlación de las variables, se encuentra una alta correlación entre las variables pagos_pn y pagos_pj. Al observar su comportamiento se encuentra que una variable explica la otra, por lo que se considera solamente utilizar una sola variable para segmentar a los clientes:
+
+```{r r}
 pagos_pn <- base$pagos_pn
 ```
 
@@ -241,19 +268,21 @@ Para las variables tiene_ventas_fisicas y tiene_ventas_digitales, se crea una va
 *1: La empresa cuenta con al menos un punto de venta.
 *2: La empresa tiene puntos de venta tanto físicos como digitales.
 
-```{r}
+```{r s}
 tiene_ventas <- grepl("tiene_ventas", names(base))
 tiene_ventas <- apply(base[tiene_ventas], MARGIN = 1, sum)
-ggplot(data.frame(tiene_ventas), aes(x = tiene_ventas)) + geom_bar()
+ggplot(data.frame(tiene_ventas), aes(x = tiene_ventas)) + geom_bar() +
+ggtitle("Tipo de ventas por empresa") +
+xlab("Tipo de venta")
 ```
 
-
-Las demás variables, al ser ya categorizadas se dejarán tal y cómo están.
-
+Las demás variables de la base de datos, las cuales en el diccionario aparecen por niveles desde el 1 al 6, al ser ya categorizadas se dejarán tal y cómo están.
 
 ## Agrupamiento de variables:
 
+
 Se agregan las demás variables categóricas a la base de características ya que al ser variables previamente categorizadas no sería consistente encontrar relaciones entre ellas ya que se desconoce su parte númerica.
+
 
 ```{r}
 nombres_categoricas <- names(base[31:length(base)])
@@ -261,10 +290,21 @@ nombres <- grepl("recaudos|pagos|tiene", nombres_categoricas)
 nombres_categoricas <- nombres_categoricas[!nombres]
 ```
 
-```{r}
+En total, de 46 variables inicialmente, luego de encontrar asociaciones entre cada una de ellas, la base de datos final consiste en una base de datos de 2333 observaciones con 18 variables. A partir de esta, se procederá a realizar un método de agrupamiento no supervisado.
+
+```{r t}
 caracteristicas <- cbind(caracteristicas, base[nombres_categoricas], pagos_pn,
                          tiene_ventas, recaudos, poco_frecuentados)
+kbl(caracteristicas) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% 
+  scroll_box("100%", height = "200px")
 ```
+
+
+## Método de agrupamiento no supervisado
+
+Se procede a realizar el algoritmo de K vecinos más cercanos.
+
 
 ```{r}
 componetes_principales <- prcomp(caracteristicas)
@@ -272,6 +312,9 @@ valores_componentes <- componetes_principales$x
 valores_componentes<- as.data.frame(valores_componentes)
 ggplot(valores_componentes, aes(x = PC1, y = PC2) ) + geom_point()
 ```
+
+<<<<<<< HEAD
+
 
 ```{r}
 set.seed(280721)
@@ -281,6 +324,7 @@ for(i in 1:15){
 }
 plot(wcss, type = "ol")
 ```
+Se considera elegir un número óptimo de clusters con k=4.
 
 
 ```{r}
@@ -292,11 +336,16 @@ ggplot(valores_componentes, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) +
 ```
 
 
-```{r}
-table(clusters)
+```{r x}
+clusters_tabla <- as.data.frame(clusters) %>% 
+  count(clusters) %>% 
+  rename(total_clientes = n)
+kbl(clusters_tabla) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
+En esta tabla se encuentran los 4 grupos seleccionados cada uno con su correspondiente número de clientes. A continuación, se desea indagar cómo es el comportamiento de estos clientes a través de las 18 variables. 
 
-```{r}
+```{r y}
 grupo1 <- caracteristicas[clusters == 1,]
 grupo2 <- caracteristicas[clusters == 2,]
 grupo3 <- caracteristicas[clusters == 3,]
@@ -305,30 +354,149 @@ grupo5 <- caracteristicas[clusters == 5,]
 ```
 
 
-```{r}
+## Comportamiento de clientes referente a las variables
+
+## Comportamiento en variable promedio_entrantes_tx
+
+
+```{r z}
 table(grupo1$promedio_entrantes_tx)
 table(grupo2$promedio_entrantes_tx)
 table(grupo3$promedio_entrantes_tx)
 table(grupo4$promedio_entrantes_tx)
 ```
+
+```{r aa,  echo = FALSE, out.width="70%", fig.align='center'}
+g1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes G1")
+
+g2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes G2")
+
+g3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes G3")
+
+g4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes G4")
+
+grid.arrange(g1, g2, g3, g4, nrow = 2)
+
+```
+
+## Comportamiento en variable promedio_salientes_tx
+
 ```{r}
 table(grupo1$promedio_salientes_tx)
 table(grupo2$promedio_salientes_tx)
 table(grupo3$promedio_salientes_tx)
 table(grupo4$promedio_salientes_tx)
 ```
+
+```{r}
+gg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G1")
+
+gg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G2")
+
+gg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G3")
+
+gg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G4")
+
+grid.arrange(gg1, gg2, gg3, gg4, nrow = 2)
+```
+
+
+
+
+
+## Comportamiento en variable promedio_entrantes_vm
 ```{r}
 table(grupo1$promedio_entrantes_vm)
 table(grupo2$promedio_entrantes_vm)
 table(grupo3$promedio_entrantes_vm)
 table(grupo4$promedio_entrantes_vm)
 ```
+
+```{r}
+ggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G1")
+
+ggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G2")
+
+ggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G3")
+
+ggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrante G4")
+
+grid.arrange(ggg1, ggg2, ggg3, ggg4, nrow = 2)
+```
+
+
+## Comportamiento en variable promedio_salientes_vm
+
 ```{r}
 table(grupo1$promedio_salientes_vm)
 table(grupo2$promedio_salientes_vm)
 table(grupo3$promedio_salientes_vm)
 table(grupo4$promedio_salientes_vm)
 ```
+
+
+```{r}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G1")
+
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G2")
+
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G3")
+
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes G4")
+
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+## Comportamiento en variable recaudos
+
 ```{r}
 table(grupo1$recaudos)
 table(grupo2$recaudos)
@@ -336,11 +504,17 @@ table(grupo3$recaudos)
 table(grupo4$recaudos)
 ```
 
+# Comportamiento en variable pagos_pn
 ```{r}
 caracteristicas$clusters = clusters
-ggplot(caracteristicas, aes(y = pagos_pn, group= clusters)) + geom_boxplot() 
+ggplot(caracteristicas, aes(y = pagos_pn, group= as.factor(clusters))) + geom_boxplot()  +
+  ggtitle("Gráfico por grupos")
 ```
 
+<<<<<<< HEAD
+## Comportamiento en variable poco_frecuentados
+=======
+>>>>>>> 0221dc8d1f0a7b97784e6b8672f73cfadbc4ba34
 
 ```{r}
 table(grupo1$poco_frecuentados)
@@ -348,6 +522,9 @@ table(grupo2$poco_frecuentados)
 table(grupo3$poco_frecuentados)
 table(grupo4$poco_frecuentados)
 ```
+
+## Comportamiento en variable ciclo_negocio
+
 ```{r}
 table(grupo1$ciclo_negocio)
 table(grupo2$ciclo_negocio)
