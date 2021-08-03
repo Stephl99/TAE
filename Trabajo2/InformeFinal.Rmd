@@ -1,0 +1,1085 @@
+---
+title: "Ejercicio de segmentación de clientes"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    theme: lumen
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Integrantes
+
+* Santiago Franco Valencia
+* Isabela Lujan Jaramillo
+* Ana María Sánchez Henao
+* Daniel Alexander Naranjo Ríos
+* Stephany Michell Lobo Laguado
+
+```{r a, include=FALSE}
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(dplyr)
+library(tidyverse)
+library(naniar)
+library(ggridges)
+library(GGally)
+library(corrplot)
+library(kableExtra)
+library(printr)
+```
+
+
+## Objetivo
+
+El objetivo de este trabajo es llevar a cabo un ejercicio de segmentación de clientes para una base de datos simulada de una empresa cuyos clientes son otras empresas. Se pretende proponer por medio de técnicas de aprendizaje no superviado, una segmentación que permita a la empresa entender mejor a sus clientes, identificar patrones de uso de productos y canales y su relación con los estados financieros.
+
+## Introducción
+
+Debido a las distintas necesidades de los consumidores en el mundo actual, las empresas se han visto frente a la necesidad de dividir y clasificar a sus clientes en diversos grupos de acuerdo a características o deseos similares con el fin de optimizar sus procesos de promoción y comercialización de los distintos productos o servicios.
+
+La segmentación de clientes surge como una estrategia que permite a las empresas optimizar de buena manera sus recursos al momento de ofrecer productos, teniendo en cuenta las necesidades específicas de los distintos consumidores. Una segmentación de clientes permite a las empresas enfocar adecuadamente sus esfuerzos de promoción de productos en pequeños grupos de clientes cuyas necesidades se ajusten a los servicios que la empresa ofrece. 
+
+## Contextualización de los datos
+
+El conjunto de datos utilizados es simulado, y está compuesto por dos distintos tipos de variables:
+
+1. **De comportamiento de los clientes en los diferentes canales y productos de la empresa**
+
+Hay hasta 10 distintos canales en los que se realizan acciones de entrada y salida. Estos se distinguen de acuerdo a las siguiente notación:
+
+* en: entrada
+* vm: valor medio anual
+* tx: transacciones mensuales promedio
+* sal: salida
+
+- en_vm_canal...(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, otros)
+- en_tx_canal...(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, otros)
+- sal_vm_canal5...(5, 2, 8, otros)
+- sal_tx_canal...(5, 2, 8, otros)
+
+2. De estados financieros de los clientes
+
+- impo_cv: [importaciones]/[compras] categorizadas
+- expo_vt: [exportaciones]/[ventas] categorizadas
+- cxp: [cuentas por pagar] categorizada con seis niveles
+- cxc: [cuentas por cobrar] categorizada con seis niveles
+- totalinventory: [valor de inventarios] categorizada con seis niveles
+- pagos_pj: [pagos hechos a personas jurídicas]/[pagos totales]
+- pagos_pn: [pagos hechos a personas naturales]/[pagos totales]
+- tiene_ventas_fisicas: la empresa tiene puntos de venta físicos (1:Si, 0:No)
+- tiene_ventas_electronicas: la empresa tiene ventas electrónicas (1:Si, 0:No)
+- recaudos_pj: [recaudos provenientes de personas jurídicas]/[recaudos totales]
+- recaudos_pn: [recaudos provenientes de personas naturales]/[recaudos totales]
+- rotacion_inventarios: [rotación de inventarios en días] categorizada con seis niveles
+- rotacion_cxc: [rotación de cuentas por pagar en días] categorizada con seis niveles
+- rotacion_cxp: [rotación de cuentas por cobrar en días] categorizada con seis niveles
+- ciclo_negocio: [ciclo de negocio en días] categorizada con seis niveles
+- ciclo_financiero: [ciclo financiero en días] categorizada con seis niveles
+
+
+## Funciones de Usuario
+
+Estas funciones fueron creadas con el fin de depurar la base de datos realizando conteo de valores faltantes, reescalamiento de variables y nuevas variables.
+
+```{r b}
+conteo <- function(columna){
+        ### Contar los na de una columna
+  return(sum(is.na(columna)))
+}
+min_max <- function(columna){
+        # Reescalado min/max
+  columna <- (columna-min(columna))/(max(columna)-min(columna))
+  return(columna)
+}
+crearTabla <- function(variable1, variable2){
+        # Creación de tablas de contingencia
+  tabla <- table(variable1, variable2)
+  nueva_tabla <- as.data.frame(tabla)
+  grafica <- ggplot(data = nueva_tabla, mapping = aes(x=variable1, y=variable2, fill=Freq)) + geom_tile()
+  return(grafica + scale_fill_gradient2(low = "white",  high = "red"))
+}
+
+segmentar_columna <- function(columna, percentiles){
+        # Segmentacion 
+  nueva <- columna 
+  nueva[nueva >0] <- findInterval(nueva[nueva>0], 
+                                  quantile(columna[columna >0], percentiles),
+                                  all.inside = TRUE) 
+  return(nueva)
+}
+```
+
+
+
+## Lectura de la base de datos
+
+```{r c}
+#base <- read.csv("C:/Users/ASUS/Desktop/2021-1/TAE/T2/T2/base.csv",
+#                 sep =";", header =T)
+base <- read.csv("base.csv", sep = ";")
+nits <- base$nit
+base <- base[-1]
+```
+
+## Preprocesamiento de los registros en los canales de entrada y salida
+
+### Promediación de las transacciones realizadas
+
+Inicialmente se crearon variables correspondientes al promedio de las transacciones diferentes en cada canal; cada entrada correspondiente a las transacciones representa la cantidad en promedio que se maneja de una transacción, si se tiene que un 0 en la base de datos significa que no hubo transacciones en ese respectivo canal, por lo que se cálculó el promedio de las transacciones que fueron mayores a 0, y el valor de 0 indica que no se hizo ninguna transacción por lo que no se intentó promediar.
+
+Se tomó el nombre de las variables correspondientes a cada tipo de transacción:
+
+```{r d}
+salientes_tx <- grepl("sal_tx", names(base))
+salientes_vm <- grepl("sal_vm", names(base))
+entrantes_tx <- grepl("en_tx", names(base))
+entrantes_vm <- grepl("en_vm", names(base))
+```
+
+Se convirtieron los 0's a NA para poder aplicar un apply en las filas y se extrajo la cantidad de NA's en cada fila para estudiar el uso de cada uno de los canales:
+
+```{r e}
+base[1:30][base[1:30] == 0] <- NA
+conteo_nas <- apply(FUN = conteo, base, MARGIN = 2)
+```
+
+Se crearon variables nuevas correspondientes al promedio en cada tipo de transacción:
+
+```{r f}
+promedio_salientes_tx <- apply(base[salientes_tx], MARGIN = 1, mean, na.rm = TRUE)
+promedio_salientes_vm <- apply(base[salientes_vm], MARGIN = 1, mean, na.rm = TRUE)
+promedio_entrantes_tx <- apply(base[entrantes_tx], MARGIN = 1, mean, na.rm = TRUE)
+promedio_entrantes_vm <- apply(base[entrantes_vm], MARGIN = 1, mean, na.rm = TRUE)
+```
+
+Se creó un dataframe con las características encontradas en la base de datos, en donde a cada valor faltante se le asignó un 0:
+
+```{r g}
+caracteristicas <- data.frame(promedio_entrantes_tx, promedio_salientes_vm,
+                   promedio_salientes_tx, promedio_entrantes_vm)
+caracteristicas[is.na(caracteristicas)] <-0
+```
+
+Debido a que se tienen distancias muy grandes entre observaciones se decidió implementar la transfomación a escala logarítmica ya que esto podía lograr que las distancias entre las observaciones fueran más robustas:
+
+```{r h}
+caracteristicas <- log(caracteristicas + 1)
+```
+
+Ahora, se segmentan los promedios de cada tipo de transacción respecto a los deciles que ocupa cada cliente en las transacciones que sí se realizaron, obteniendo las siguientes variables categóricas ordinales:
+
+*en_tx_promedio: Entrada promedio de las transacciones mensuales promedio en todos los canales.
+
+*en_vm_promedio: Entrada promedio del valor medio anual en todos los canales.
+
+*sal_tx_promedio: Salida promedio de las transacciones mensuales promedio en todos los canales.
+
+*sal_vm_promedio: Salida promedio del valor medio anual en todos los canales.
+
+Los valores de estas variables corresporán a:
+
+*0: Este cliente no realizó ninguna transacción para este tipo de transacción.
+
+*1: En promedio las transacciones de este cliente están entre el 0% y el 10% de las transacciones realizadas para este tipo de transacción.
+
+*2:En promedio las transacciones de este cliente están entre el 10% y el 20% de las transacciones realizadas para este tipo de transacción.
+
+*3: En promedio las transacciones de este cliente están entre el 20% y el 30% de las transacciones realizadas para este tipo de transacción.
+
+*4: En promedio las transacciones de este cliente están entre el 30% y el 40% de las transacciones realizadas para este tipo de transacción.
+
+*5: En promedio las transacciones de este cliente están entre el 40% y el 50% de las transacciones realizadas para este tipo de transacción.
+
+*6: En promedio las transacciones de este cliente están entre el 50% y el 60% de las transacciones realizadas para este tipo de transacción.
+
+*7: En promedio las transacciones de este cliente están entre el 60% y el 70% de las transacciones realizadas para este tipo de transacción.
+
+*8: En promedio las transacciones de este cliente están entre el 70% y el 80% de las transacciones realizadas para este tipo de transacción.
+
+*9: En promedio las transacciones de este cliente están entre el 80% y el 90% de las transacciones realizadas para este tipo de transacción.
+
+*10: En promedio las transacciones de este cliente están entre el 90% y el 100% de las transacciones realizadas para este tipo de transacción.
+
+```{r j}
+caracteristicas[1:4] <- apply(caracteristicas[1:4], MARGIN = 2, segmentar_columna, percentiles = seq(0, 1, by = 0.1))
+```
+
+### Uso de los canales de entrada y salida:
+
+Ya que un valor de 0 en cada transacción significa que no hubo transacción en un canal, se analizó el comportamiento de las transacciones realizadas por cada empresa, para encontrar cuales eran los canales más o menos frecuentados:
+
+```{r k, fig.align='center', out.width='70%'}
+base[1:30][base[1:30]==0] <- NA
+vis_miss(base[1:30], sort_miss = TRUE)
+```
+
+A partir de la gráfica se observa que existen canales en donde menos del 30% de las empresas realizan transacciones, por lo cual se sugirió la creación de una variable llamada poco_frecuentados, que indicara si se utilizaron aquellos canales que tuvieron muy poco uso entre las distintas empresas:
+
+```{r l}
+# Se calcula el porcentaje de valores faltantes en cada canal:
+poco_frecuentados <- apply(base[1:30], MARGIN = 2, FUN = conteo)/2233
+# Se seleccionan los canales cuyo uso es menor o igual al 30 %
+poco_frecuentados <- poco_frecuentados[poco_frecuentados > 0.7]
+poco_frecuentados <- names(poco_frecuentados)
+# Aqui los conteo_nas NA vuelven a ser cero
+base[is.na(base)] <- 0
+# Se crea un vector llamado poco_frecuentados que condensa la información de los canales poco frecuentados
+poco_frecuentados <- apply(base[poco_frecuentados], MARGIN = 1, mean)
+poco_frecuentados[poco_frecuentados > 0] <- 1
+```
+
+```{r m}
+poco <- as.data.frame(poco_frecuentados) %>% 
+  count(poco_frecuentados) %>% 
+  rename(uso_canal = poco_frecuentados, cuenta=n)
+```
+
+```{r n}
+kable(poco, caption = "Uso de los canales poco frecuentados por las empresas", format = "pipe")
+```
+
+```{r o,  fig.align='center', out.width='70%'}
+ggplot(data = as.data.frame(poco_frecuentados)) + 
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) +
+  ggtitle("Gráfica canales poco usados") +
+  xlab("Canales poco frecuentes utilizados 0: no - 1: si")
+```
+
+Como se evidencia en la gráfica y en la tabla de distribución de frecuencias, se observa que cerca de 1213 clientes de la base de datos NO utilizan los canales poco frecuentados, en comparción con los 1020 clientes que sí lo hacen.
+
+## Preprocesamiento de las variables de estados y características de los clientes 
+
+### Recaudos
+
+Realizando un análisis descriptivo previo se encontró que la mayoría de las empresas no hicieron recaudos, por lo que se crea la variable Recaudos para indicar qué empresas hicieron o no recaudos.
+
+```{r p,  fig.align='center', out.width='70%'}
+recaudos <- grepl("recaudo", names(base))
+recaudos <- apply(base[recaudos], MARGIN = 1, mean)
+recaudos[recaudos > 0 ] <- 1
+ggplot(data.frame(recaudos), aes(x = as.factor(recaudos))) + geom_bar() +
+ggtitle("Empresas y realización de recaudos") +
+xlab("recaudos")
+```
+
+### Pagos
+
+Se procedió a hallar la matriz de correlación entre los pagos a personas juridicas y los pagos a personas naturales:
+
+```{r bb,  fig.align='center', out.width='70%'}
+pagos <- grepl("pagos", names(base))
+correlaciones_pagos <- cor(base[pagos])
+corrplot(correlaciones_pagos, method = "number")
+```
+
+En la matriz de correlación se observa una alta correlación entre las variables pagos_pn y pagos_pj. Al observar su comportamiento se encuentra que una variable explica la otra, por lo que se consideró el uso de una sola de estas variables para segmentar a los clientes:
+
+```{r r}
+pagos_pn <- base$pagos_pn
+```
+
+```{r}
+pagos_pn1 <- as.data.frame(pagos_pn)
+ggplot(pagos_pn1, aes(x=pagos_pn)) + 
+  geom_histogram() +
+  ggtitle("Histograma pagos_pn")
+```
+
+
+### Tiene ventas físicas y/o digitales:
+
+Para las variables tiene_ventas_fisicas y tiene_ventas_digitales, se creó una variable llamada tiene_ventas que cuyos valores fueron definidos de la siguiente manera:
+
+*0: La empresa no cuenta con un punto de venta.
+
+*1: La empresa cuenta con al menos un punto de venta.
+
+*2: La empresa tiene puntos de venta tanto físicos como digitales.
+
+```{r s,  fig.align='center', out.width='70%'}
+tiene_ventas <- grepl("tiene_ventas", names(base))
+tiene_ventas <- apply(base[tiene_ventas], MARGIN = 1, sum)
+ggplot(data.frame(tiene_ventas), aes(x = tiene_ventas)) + geom_bar() +
+ggtitle("Tipo de ventas por empresa") +
+xlab("Tipo de venta")
+```
+
+Las variables restantes, categorizadas de 1 a 6 de acuerdo al diccionario de los datos, fueron tomadas de la misma manera debido a que ya se encontraban categorizadas.
+
+## Agrupamiento de variables
+
+Se agregaron las demás variables categóricas a la base de características ya que al ser variables previamente categorizadas no sería consistente encontrar relaciones entre ellas ya que se desconoce su parte númerica:
+
+```{r}
+nombres_categoricas <- names(base[31:length(base)])
+nombres <- grepl("recaudos|pagos|tiene", nombres_categoricas)
+nombres_categoricas <- nombres_categoricas[!nombres]
+```
+
+De 46 variables que componían la base de datos inicial, se encontraron ciertas asociaciones y de acuerdo a esto se consolidó una base de datos final, con 2333 observaciones y 18 variables. A partir de esta, se procedió a realizar un método de agrupamiento no supervisado.
+
+```{r t}
+caracteristicas <- cbind(caracteristicas, base[nombres_categoricas], pagos_pn,
+                         tiene_ventas, recaudos, poco_frecuentados)
+kbl(caracteristicas) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% 
+  scroll_box("100%", height = "200px")
+```
+
+## Método de agrupamiento no supervisado
+
+Se procedió a realizar el algoritmo de **K vecinos más cercanos**.
+
+El método de los k vécinos más cercanos para aprendizaje no supervizado, se trata de una técnica ideada para encontrar subgrupos o clusters en un conjunto de datos, de tal forma que las observaciones que hacen parte de un mismo grupo tenga ciertas características similares entre sí.
+
+Esta técnica de segmentación requiere de la preespecificación de un número determinado de $k$ clusters, que particionan al conjunto de datos en $k$ subconjuntos, denotados $C_1,C_",...,C_k$; estos clusters son disjuntos, y la unión de estos conforma el conjunto total de datos.
+
+Los resultados obtenidos por este método dependen del número $k$ de clusters fijado, ya que ete algoritmo encuentra un valor mínimo (en términos de la distancia euclidea) de manera local para cada cluster.
+
+```{r,  fig.align='center', out.width='70%'}
+componetes_principales <- prcomp(caracteristicas)
+valores_componentes <- componetes_principales$x
+valores_componentes<- as.data.frame(valores_componentes)
+ggplot(valores_componentes, aes(x = PC1, y = PC2) ) + geom_point()
+```
+
+
+```{r,  fig.align='center', out.width='70%'}
+set.seed(280721)
+wcss <- vector()
+for(i in 1:15){
+  wcss[i] <- sum(kmeans(caracteristicas, i)$withinss)
+}
+plot(wcss, type = "ol")
+```
+
+Se consideró elegir un número óptimo de clusters con $k=4$.
+
+```{r,  fig.align='center', out.width='70%'}
+set.seed(280721)
+kmeans_datos <- kmeans(caracteristicas, 4, iter.max =1000, nstart = 10)
+clusters <- kmeans_datos$cluster
+valores_componentes$clusters <- clusters
+ggplot(valores_componentes, aes(x = PC1, y = PC2, col = as.factor(clusters)) ) + geom_point()
+```
+
+
+```{r x}
+clusters_tabla <- as.data.frame(clusters) %>% 
+  count(clusters) %>% 
+  rename(total_clientes = n)
+kbl(clusters_tabla) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+En esta tabla se encuentran los 4 grupos seleccionados cada uno con su correspondiente número de clientes. A continuación, se quiso indagar cómo era el comportamiento de estos clientes a través de las 18 variables. 
+
+```{r y}
+grupo1 <- caracteristicas[clusters == 1,]
+grupo2 <- caracteristicas[clusters == 2,]
+grupo3 <- caracteristicas[clusters == 3,]
+grupo4 <- caracteristicas[clusters == 4,]
+```
+
+## Comportamiento de los grupos de clientes en los canales entrantes y salientes:
+
+### Comportamiento en la variable promedio_entrantes_tx
+
+
+
+```{r aa,  echo = FALSE, out.width="70%", fig.align='center'}
+g1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes_tx G1")
+g2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes_tx G2")
+g3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes_tx G3")
+g4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes_tx G4")
+grid.arrange(g1, g2, g3, g4, nrow = 2)
+
+```
+
+```{r z}
+kable(t(table(grupo1$promedio_entrantes_tx)), caption = "Distribución de observaciones del grupo 1 en la variable promedio_entrantes_tx", format = "pipe")
+kable(t(table(grupo2$promedio_entrantes_tx)), caption = "Distribución de observaciones del grupo 2 en la variable promedio_entrantes_tx",
+format = "pipe")
+kable(t(table(grupo3$promedio_entrantes_tx)), caption = "Distribución de observaciones del grupo 3 en la variable promedio_entrantes_tx", format = "pipe")
+kable(t(table(grupo4$promedio_entrantes_tx)), caption = "Distribución de observaciones del grupo 4 en la variable promedio_entrantes_tx", format = "pipe")
+```
+* En el grupo 1, el promedio de valor del tiquet de entrada de las transacciones mensuales promedio presenta una distribución asimétrica hacia la derecha, contrario a lo que sucede en el grupo 4, ya que se oboserva una distribución asimétrica a la izquierda. Para el grupo 2 se tiene una distribución un poco más simétrica y para el grupo 3 hay una distribución más o menos uniforme.
+
+### Comportamiento en la variable promedio_salientes_tx
+
+```{r}
+kable(t(table(grupo1$promedio_salientes_tx)), caption = "Distribución de observaciones del grupo 1 en la variable promedio_salientes_tx", format = "pipe")
+kable(t(table(grupo2$promedio_salientes_tx)), caption = "Distribución de observaciones del grupo 2 en la variable promedio_salientes_tx", format = "pipe")
+kable(t(table(grupo3$promedio_salientes_tx)), caption = "Distribución de observaciones del grupo 3 en la variable promedio_salientes_tx", format = "pipe")
+kable(t(table(grupo4$promedio_salientes_tx)), caption = "Distribución de observaciones del grupo 4 en la variable promedio_salientes_tx", format = "pipe")
+```
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_tx G1")
+gg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_tx G2")
+gg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_tx G3")
+gg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_tx))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_tx G4")
+grid.arrange(gg1, gg2, gg3, gg4, nrow = 2)
+```
+
+* El promedio de valor del tiquet de salida de las transacciones mensuales promedio presenta de nuevo, para los grupos 1 y 4 distribuciones asimétricas a derecha y a izquierda, respectivamente. En grupo 2 se obsrrva una distribución un poco más uniforme, mientras que en el grupo 3 hay una distribución más o menos simétrica para esta variable.
+
+### Comportamiento en la variable promedio_entrantes_vm
+
+
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+ggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("promedio_entrantes_vm G1")
+ggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("promedio_entrantes_vm G2")
+ggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("promedio_entrantes_vm G3")
+ggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_entrantes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_entrantes_vm G4")
+grid.arrange(ggg1, ggg2, ggg3, ggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$promedio_entrantes_vm)), caption = "Distribución de observaciones del grupo 1 en la variable promedio_entrantes_vm", format = "pipe")
+kable(t(table(grupo2$promedio_entrantes_vm)), caption = "Distribución de observaciones del grupo 2 en la variable promedio_entrantes_vm", format = "pipe")
+kable(t(table(grupo3$promedio_entrantes_vm)), caption = "Distribución de observaciones del grupo 3 en la variable promedio_entrantes_vm", format = "pipe")
+kable(t(table(grupo4$promedio_entrantes_vm)), caption = "Distribución de observaciones del grupo 4 en la variable promedio_entrantes_vm", format = "pipe")
+
+```
+* Para la variable promedio de entrada del valor medio anual se observan comportamientos similares, distribución asimétrica positiva para el grupo 1, asimétrica negativa para el grupo 4, y aproximadamente simétrica en los grupos 2 y 3.
+
+### Comportamiento en la variable promedio_salientes_vm
+
+```{r}
+kable(t(table(grupo1$promedio_salientes_vm)), caption = "Distribución de observaciones del grupo 1 en la variable promedio_salientes_vm", format = "pipe")
+kable(t(table(grupo2$promedio_salientes_vm)), caption = "Distribución de observaciones del grupo 2 en la variable promedio_salientes_vm", format = "pipe")
+kable(t(table(grupo3$promedio_salientes_vm)), caption = "Distribución de observaciones del grupo 3 en la variable promedio_salientes_vm", format = "pipe")
+kable(t(table(grupo4$promedio_salientes_vm)), caption = "Distribución de observaciones del grupo 4 en la variable promedio_salientes_vm", format = "pipe")
+```
+
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_vm G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_vm G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_vm G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(promedio_salientes_vm))) + 
+  xlab("Deciles")+
+  ggtitle("Promedio_salientes_vm G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+* Al igual que con las variables anteriores, hay una distribución asimétrica positiva para el grupo 1 y asimétrica negativa para el grupo 4. El grupo 3 presenta una distribución más o menos simétrica, y aunque no es muy claro, la distribución de los datos en el grupo 2 para la variable de promedio del valor medio anual de ticket en los canales no es tan clara.
+
+### Comportamiento en la variable poco_frecuentados
+
+
+
+```{r}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) + 
+  xlab("Deciles")+
+  ggtitle("poco_frecuentados G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) + 
+  xlab("Deciles")+
+  ggtitle("poco_frecuentados G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) + 
+  xlab("Deciles")+
+  ggtitle("poco_frecuentados G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(poco_frecuentados))) + 
+  xlab("Deciles")+
+  ggtitle("poco_frecuentados G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$poco_frecuentados)), caption = "Distribución de observaciones del grupo 1 en la variable poco_frecuentados",
+      format = "pipe")
+kable(t(table(grupo2$poco_frecuentados)), caption = "Distribución de observaciones del grupo 2 en la variable poco_frecuentados",
+      format = "pipe")
+kable(t(table(grupo3$poco_frecuentados)), caption = "Distribución de observaciones del grupo 3 en la variable poco_frecuentados",
+      format = "pipe")
+kable(t(table(grupo4$poco_frecuentados)), caption = "Distribución de observaciones del grupo 4 en la variable poco_frecuentados",
+      format = "pipe")
+```
+
+* Las empresas dentro de los grupos 2 y 4 utilizan más los canales que suelen ser poco frecuentados, mientras que, en especial las empresas del grupo 1 no hacen mucho uso de ellos.
+
+```{r, include = FALSE}
+caracteristicas$clusters <- clusters
+```
+## Comportamiento de los grupos en las variables de estados y características de los clientes
+
+
+### Clientes que realizan recaudos
+
+
+
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(recaudos))) + 
+  xlab("Categorías")+
+  ggtitle("recaudos G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(recaudos))) + 
+  xlab("Categorías")+
+  ggtitle("recaudos G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(recaudos))) + 
+  xlab("Categorías")+
+  ggtitle("recaudos G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(recaudos))) + 
+  xlab("Categorías")+
+  ggtitle("recaudos G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$recaudos)), caption = "Distribución de observaciones del grupo 1 en la variable recaudos", format = "pipe")
+kable(t(table(grupo2$recaudos)), caption = "Distribución de observaciones del grupo 2 en la variable recaudos", format = "pipe")
+kable(t(table(grupo3$recaudos)), caption = "Distribución de observaciones del grupo 3 en la variable recaudos", format = "pipe")
+kable(t(table(grupo4$recaudos)), caption = "Distribución de observaciones del grupo 4 en la variable recaudos", format = "pipe")
+```
+
+* En todos los grupos se observa un comportamiento similar de acuerdo a la variable recaudos, sin embargo, en el grupo 4 hay una proporción considerable de empresas que sí realizan recaudos.
+
+
+### Porcentaje de pagos a personas naturales y jurídicas 
+
+
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gg <- ggplot(data = caracteristicas, aes(x=factor(clusters), y = pagos_pn))
+gg + geom_boxplot() + xlab("Grupo") +
+  ylab("Porcentaje de pagos a personas naturales")
+```
+
+Se observa que a medida que aumentan los grupos aumenta el porcentaje de pagos realizados a personas naturales, es decir que los grupos 3 y 4 tienden a realizar más pagos a personas naturales mientras que los grupos 1 y 2 tienden a realizar más pagos a las personas jurídicas. Siendo el grupo 4 el que más pagos realiza a personas naturales y el grupo 1 el que menos realiza.
+
+
+### Puntos de venta de los clientes:
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(tiene_ventas))) + 
+  xlab("Categorías")+
+  ggtitle("tiene_ventas G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(tiene_ventas))) + 
+  xlab("Categorías")+
+  ggtitle("tiene_ventas G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(tiene_ventas))) + 
+  xlab("Categorías")+
+  ggtitle("tiene_ventas G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(tiene_ventas))) + 
+  xlab("Categorías")+
+  ggtitle("tiene_ventas G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$tiene_ventas)), caption = "Distribución de observaciones del grupo 1 en la variable tiene_ventas", format = "pipe")
+kable(t(table(grupo2$tiene_ventas)), caption = "Distribución de observaciones del grupo 2 en la variable tiene_ventas", format = "pipe")
+kable(t(table(grupo3$tiene_ventas)), caption = "Distribución de observaciones del grupo 3 en la variable tiene_ventas", format = "pipe")
+kable(t(table(grupo4$tiene_ventas)), caption = "Distribución de observaciones del grupo 4 en la variable tiene_ventas", format = "pipe")
+```
+
+* Es posible observar que no hay empresas dentro del grupo 1 que tengan puntos de venta físicos y digitales; en general para todos los grupos, hay pocas empresas con esta característica, aunque en los grupos 1 y 3 hay más empresas que no tiene punto de venta (digitales) y en los grupos 2 y 4 hay más empresas con al menos un punto de venta físico.
+
+### Comportamiento en los valores de inventario
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(totalinventory))) + 
+  xlab("Categorías")+
+  ggtitle("totalinventory G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(totalinventory))) + 
+  xlab("Categorías")+
+  ggtitle("totalinventory G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(totalinventory))) + 
+  xlab("Categorías")+
+  ggtitle("totalinventory G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(totalinventory))) + 
+  xlab("Categorías")+
+  ggtitle("totalinventory G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$totalinventory)), caption = "Distribución de observaciones del grupo 1 en la variable totalinventory", format = "pipe")
+kable(t(table(grupo2$totalinventory)), caption = "Distribución de observaciones del grupo 2 en la variable totalinventory", format = "pipe")
+kable(t(table(grupo3$totalinventory)), caption = "Distribución de observaciones del grupo 3 en la variable totalinventory", format = "pipe")
+kable(t(table(grupo4$totalinventory)), caption = "Distribución de observaciones del grupo 4 en la variable totalinventory", format = "pipe")
+```
+
+* En el grupo 1, la mayoría de las empresas se encuentran en las categorías 1 y 2 del valor de inventarios, en el 2 hay muy pocas observaciones en la categoría 1 de esta variable. En el grupo 3 hay pocas empresas pertenecientes a las categorías 4, 5 y 6 y por último, la mayor parte de las empresas del grupo 4 están categorizadas en el nivel 6 de esta variable.
+
+### Comportamiento en la rotacion de invetarios en días
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(rotacion_inventarios))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_inventarios G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(rotacion_inventarios))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_inventarios G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(rotacion_inventarios))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_inventarios G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(rotacion_inventarios))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_inventarios G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$rotacion_inventarios)), caption = "Distribución de observaciones del grupo 1 en la variable rotacion_inventarios", format = "pipe")
+kable(t(table(grupo2$rotacion_inventarios)), caption = "Distribución de observaciones del grupo 2 en la variable rotacion_inventarios", format = "pipe")
+kable(t(table(grupo3$rotacion_inventarios)), caption = "Distribución de observaciones del grupo 3 en la variable rotacion_inventarios", format = "pipe")
+kable(t(table(grupo4$rotacion_inventarios)), caption = "Distribución de observaciones del grupo 4 en la variable rotacion_inventarios", format = "pipe")
+```
+
+* Para la variable rotación de inventarios en días, en el grupo 3 se ven pocas empresas categorizadas en los niveles 5 y 6. También, hay pocas empresas en la categoría 5 dentro del grupo 1. Para el grupo 2, la mayoría de las empresas están categorizadas en el nivel 6 de esta variable, mientras que en el grupo 4 se observa un comprotamiento un poco más homogéneo.
+
+### Comportamiento en las exportaciones respecto a las ventas
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(expo_vt))) + 
+  xlab("Categorías")+
+  ggtitle("expo_vt G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(expo_vt))) + 
+  xlab("Categorías")+
+  ggtitle("expo_vt G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(expo_vt))) + 
+  xlab("Categorías")+
+  ggtitle("expo_vt G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(expo_vt))) + 
+  xlab("Categorías")+
+  ggtitle("expo_vt G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$expo_vt)), caption = "Distribución de observaciones del grupo 1 en la variable expo_vt", format = "pipe")
+kable(t(table(grupo2$expo_vt)), caption = "Distribución de observaciones del grupo 2 en la variable expo_vt", format = "pipe")
+kable(t(table(grupo3$expo_vt)), caption = "Distribución de observaciones del grupo 3 en la variable expo_vt", format = "pipe")
+kable(t(table(grupo4$expo_vt)), caption = "Distribución de observaciones del grupo 4 en la variable expo_vt", format = "pipe")
+```
+
+* Para los grupo 1 y 3, gran parte de las empresas tienen ventas categorizadas en los niveles 1 y 2, mientras que en los grupos 2 y 4 las ventas de las empresas en su mayoría están categorizadas en el nivel 2. En el conjunto total de datos, hay poca presencia de empresas con ventas categorizadas en el nivel 3.
+
+### Comportamiento en las importaciones respecto a las compras
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(impo_cv))) + 
+  xlab("Categorías")+
+  ggtitle("impo_cv G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(impo_cv))) + 
+  xlab("Categorías")+
+  ggtitle("impo_cv G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(impo_cv))) + 
+  xlab("Categorías")+
+  ggtitle("impo_cv G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(impo_cv))) + 
+  xlab("Categorías")+
+  ggtitle("impo_cv G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$impo_cv)), caption = "Distribución de observaciones del grupo 1 en la variable impo_cv", format = "pipe")
+kable(t(table(grupo2$impo_cv)), caption = "Distribución de observaciones del grupo 2 en la variable impo_cv", format = "pipe")
+kable(t(table(grupo3$impo_cv)), caption = "Distribución de observaciones del grupo 3 en la variable impo_cv", format = "pipe")
+kable(t(table(grupo4$impo_cv)), caption = "Distribución de observaciones del grupo 4 en la variable impo_cv", format = "pipe")
+```
+
+* Hay gran mayoría de empresas categorizadas en los niveles 1 y 2 de la variable compras categorizadas para los grupos 1 y 3. En el grupo 2 hay una distribución más o menos uniforme de las empresas entre las distintas categorías, a excpeción de la 5 y por último, la mayor parte de las empresas categorizadas en el grupo 4 están categorizadas en el nivel 2 de esta variable.
+
+### Comportamiento en las cuentas por cobrar
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(cxc))) + 
+  xlab("Categorías")+
+  ggtitle("cxc G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(cxc))) + 
+  xlab("Categorías")+
+  ggtitle("cxc G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(cxc))) + 
+  xlab("Categorías")+
+  ggtitle("cxc G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(cxc))) + 
+  xlab("Categorías")+
+  ggtitle("cxc G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$cxc)), caption = "Distribución de observaciones del grupo 1 en la variable cxc", format = "pipe")
+kable(t(table(grupo2$cxc)), caption = "Distribución de observaciones del grupo 2 en la variable cxc", format = "pipe")
+kable(t(table(grupo3$cxc)), caption = "Distribución de observaciones del grupo 3 en la variable cxc", format = "pipe")
+kable(t(table(grupo4$cxc)), caption = "Distribución de observaciones del grupo 4 en la variable cxc", format = "pipe")
+```
+
+* En el grupo 1 hay más empresas en los niveles 1, 2 y 3 de la variable cuentas por cobrar en comparación a las empresas en otras categorías, contrario al grupo 4 que la mayor parte de las empresas se encuentran clasificadas en el nivel 6 de esta variable.
+
+### Comportamiento en las cuentas por pagar
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(cxp))) + 
+  xlab("Categorías")+
+  ggtitle("cxp G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(cxp))) + 
+  xlab("Categorías")+
+  ggtitle("cxp G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(cxp))) + 
+  xlab("Categorías")+
+  ggtitle("cxp G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(cxp))) + 
+  xlab("Categorías")+
+  ggtitle("cxp G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$cxp)), caption = "Distribución de observaciones del grupo 1 en la variable cxp", format = "pipe")
+kable(t(table(grupo2$cxp)), caption = "Distribución de observaciones del grupo 2 en la variable cxp", format = "pipe")
+kable(t(table(grupo3$cxp)), caption = "Distribución de observaciones del grupo 3 en la variable cxp", format = "pipe")
+kable(t(table(grupo4$cxp)), caption = "Distribución de observaciones del grupo 4 en la variable cxp", format = "pipe")
+```
+* Al igual que la variable cuentas por cobrar, la variabe cuentas por pagar en el grupo 1, presenta la mayoría de las observaciones dentro de las categorías 1 y 2, mientras que en el grupo 4 hay gran cantidad categorizadas en el nivel 6. Para los grupos 2 y 3, hay muchas empresas clasificadas en el nivel 2 de esta variable.
+
+### Comportamiento en la rotación de cuentas por cobrar en días
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxc))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxc G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxc))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxc G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxc))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxc G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxc))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxc G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$rotacion_cxc)), caption = "Distribución de observaciones del grupo 1 en la variable rotacion_cxc", format = "pipe")
+kable(t(table(grupo2$rotacion_cxc)), caption = "Distribución de observaciones del grupo 2 en la variable rotacion_cxc", format = "pipe")
+kable(t(table(grupo3$rotacion_cxc)), caption = "Distribución de observaciones del grupo 3 en la variable rotacion_cxc", format = "pipe")
+kable(t(table(grupo4$rotacion_cxc)), caption = "Distribución de observaciones del grupo 4 en la variable rotacion_cxc", format = "pipe")
+```
+
+* Las empresas están distribuidas de manera más uniforme en comparación a otras variables, para la variable rotación de cuentas por pagar en días, a pesar de que para el grupo 3 hay pocas cuyo valor para esta variabe corresponde a las categorías 3 o 4.
+
+### Comportamiento en la rotación de cuentas por pagar en días
+
+```{r, echo = FALSE, out.width="70%", fig.align='center'}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxp))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxp G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxp))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxp G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxp))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxp G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(rotacion_cxp))) + 
+  xlab("Categorías")+
+  ggtitle("rotacion_cxp G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$rotacion_cxp)), caption = "Distribución de observaciones del grupo 1 en la variable rotacion_cxp", format = "pipe")
+kable(t(table(grupo2$rotacion_cxp)), caption = "Distribución de observaciones del grupo 2 en la variable rotacion_cxp", format = "pipe")
+kable(t(table(grupo3$rotacion_cxp)), caption = "Distribución de observaciones del grupo 3 en la variable rotacion_cxp", format = "pipe")
+kable(t(table(grupo4$rotacion_cxp)), caption = "Distribución de observaciones del grupo 4 en la variable rotacion_cxp", format = "pipe")
+```
+
+* La rotación de cuentas por cobrar en días presenta pocas empresas en las categorías 3 y 4 dentro de los grupos 3 y 4.
+
+### Comportamiento del ciclo de negocio en días
+
+```{r}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(ciclo_negocio))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_negocio G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(ciclo_negocio))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_negocio G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(ciclo_negocio))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_negocio G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(ciclo_negocio))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_negocio G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$ciclo_negocio)), caption = "Distribución de observaciones del grupo 1 en la variable ciclo_negocio", format = "pipe")
+kable(t(table(grupo2$ciclo_negocio)), caption = "Distribución de observaciones del grupo 2 en la variable ciclo_negocio", format = "pipe")
+kable(t(table(grupo3$ciclo_negocio)), caption = "Distribución de observaciones del grupo 3 en la variable ciclo_negocio", format = "pipe")
+kable(t(table(grupo4$ciclo_negocio)), caption = "Distribución de observaciones del grupo 4 en la variable ciclo_negocio", format = "pipe")
+```
+
+* El número de empresas del grupo 2 que pertenecen a la categoría 2 en la variable de ciclo_negocio es casi nulo, siendo nulo para la categoría 1. Se ven pocas empresas pertenecientes a la categoría 6 de esta variable y que sean pertenecientes al grupo 3 de la clasificación
+
+
+### Comportamiento del ciclo financiero en días:
+
+```{r}
+gggg1 <- ggplot(grupo1) +
+  stat_count(mapping = aes(x = as.factor(ciclo_financiero))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_financiero G1")
+gggg2 <- ggplot(grupo2) +
+  stat_count(mapping = aes(x = as.factor(ciclo_financiero))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_financiero G2")
+gggg3 <- ggplot(grupo3) +
+  stat_count(mapping = aes(x = as.factor(ciclo_financiero))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_financiero G3")
+gggg4 <- ggplot(grupo4) +
+  stat_count(mapping = aes(x = as.factor(ciclo_financiero))) + 
+  xlab("Categorías")+
+  ggtitle("ciclo_financiero G4")
+grid.arrange(gggg1, gggg2, gggg3, gggg4, nrow = 2)
+```
+
+```{r}
+kable(t(table(grupo1$ciclo_financiero)), 
+      caption = "Distribución de observaciones del grupo 1 en la variable ciclo_financiero",
+      format = "pipe")
+kable(t(table(grupo2$ciclo_financiero)), 
+      caption = "Distribución de observaciones del grupo 2 en la variable ciclo_financiero",
+      format = "pipe")
+kable(t(table(grupo3$ciclo_financiero)), 
+      caption = "Distribución de observaciones del grupo 3 en la variable ciclo_financiero",
+      format = "pipe")
+kable(t(table(grupo4$ciclo_financiero)), 
+      caption = "Distribución de observaciones del grupo 4 en la variable ciclo_financiero",
+      format = "pipe")
+```
+
+## Conclusiones generales respecto al comportamiento de los grupos:
+
+### Grupo 1:
+
+#### Comportamiento en canales de entrada y salida:
+
+Los clientes del grupo 1 se caracterizan por realizar pocas transacciones en los canales de entrada y salida, y las pocas que realiza en promedio son más bajas que las de los demás grupos, además no tienden a utilizar los canales poco frecuentados.
+
+#### Comportamiento de estados financieros:
+
+Las empresas pertenecientes al grupo 1 tienden a realizar pocos recaudos, no sulen tener un punto de venta, la mayoría de sus pagos son realizados a personas jurídicas, tienen valores bajos en las importaciones y exportaciones respecto a las compras y las ventas, en las cuentas por cobrar y cuentas por pagar, en el valor de inventarios y en su rotación de inventarios.
+
+En la rotación de inventarios por día tienden a predominar los valores bajos, aunque hay un ligero subgrupo de clientes allí que poseen valores altos. Su rotación de cuentas por cobrar y cuentas por pagar en días es diversa, aunque predominan los valores bajos. 
+Tienden a tener ciclos financiero y de negocio similares en días,habiendo una mayor frecuencia del valor 6 en ambos ciclos.
+
+
+### Grupo 2:
+
+#### Comportamiento en canales de entrada y salida:
+
+Los miembros del grupo 2 en sus transacciones salientes promedio para el valor del ticket medio mensual y el valor medio anual tienen un pequeño grupo de clientes que no realizan transacciones, en sus transacciones salientes del ticket medio mensual y el valor medio anual manejan hasta el orden 6 de las transacciones, es decir que son clientes que manejan hasta el 60% del promedio de las transacciones salientes.
+
+En sus transacciones entrantes se maneja una especie de normalidad en el ticket medio mensual ya que los valores están alrededor del 50% y el 60% de las transacciones entrantes, en el valor medio anual los valores están en torno al 40% y el 50%, habiendo una mayor frecuencia en los valores superiores al 50%.
+
+Se resalta que más de la mitad de los clientes pertenecientes al grupo 2 utilizan los canales poco frecuentados.
+
+#### Comportamiento de estados financieros:
+
+Se caracterizan por realizar muy pocos recaudos,realizar más pagos a personas jurídicas que naturales y ser clientes que sobretodo poseen al menos un punto de venta, aunque como en todos los grupos con un pequeño subgrupo de clientes que no tienen ningún punto de venta.
+
+En sus exportaciones respecto a las ventas predomina el valor de 2 que es el valor medio, en sus importaciones respecto a las compras hay homogeneidad en los valores a excepción del 5 que es más bajo, es decir, son clientes cuyas exportaciones tienden a ser medias y sus miembros pueden estar en cualquier nivel de importaciones a excepción del 5. Se resalta que el valor de 4 de exportaciones tiene la mayor cantidad de miembros en este grupo.
+
+Su valor de inventario se caracteriza por ser de valor dos o superior, con una alta frecuencia en el valor de 6, en su rotación de inventarios predomina el valor de 6, es decir que el grupo 2 se cracteriza por tener clientes que rotan mucho y tienen mucha frecuencia en los valores superiores al primero en su inventario.
+
+Sus cuentas por cobrar se caracterizan por estar sobretodo en los valores de 2, 3 y 6, además la mayoría de sus cuentas por pagar están alrededor de 2.  Mientras que su rotación de cuentas por cobrar tiende a ser de dos o superior con una ligera cantidad más de miembros que poseen el valor 4 y en su rotación de cuentas por pagar pueden estar en cualquier valor ya que hay una ligera uniformidad en las categorías. 
+
+Sus miembros en su mayoría tienen valores en su ciclo financiero y de negocio muy altos, predominando en ambos ciclos los valores de 6 y 5.
+
+### Grupo 3:
+
+#### Comportamiento en canales de entrada y salida:
+
+
+El grupo 3 se caracteriza por tener en promedio un comportamiento similar a la normalidad en sus transacciones de entrada y salida, a excepción de sus transacciones entrantes de sus transacciones mensuales medias, donde se ve un comportamiento homogéneo con pocos valores de 1 y 0. 
+
+Es decir, los miembros del grupo 3 en las transacciones entrantes del valor medio de sus transacciones mensuales en promedio tienden a estar en cualquier valor a excepción del 0 y el 1.
+En sus transacciones entrantes del valor medio anual los valores circulan en promedio alrededor del 50% y el 60% del valor de las transacciones.
+Sus transacciones salientes del valor medio anual tienden en promedio a estar entre el 60% y el 70% de las transacciones.
+Finalmente,el valor medio de sus transacciones mensuales en promedio tiende a estar alrededor del 70% de las transacciones, habiendo una ligera predominancia en los porcentajes más bajos.
+
+Más de la mitad de los miembros del grupos 3 no utilizan los canales poco frecuentados.
+
+#### Comportamiento de estados financieros:
+
+Los miembros del grupo 3 no suelen realizar recaudos, realizan más pagos a personas naturales que a personas jurídicas, más o menos la mitad de sus miembros no tienen punto de venta y sí lo tienen, suelen tener uno.
+
+El valor de su inventario así como en el grupo 1 suele ser bajo, al igual que su rotación.
+
+Sus exportaciones respecto a las ventas, al igual que sus importaciones respecto a las compras en su mayoría son de 1 y 2, es decir que tienen una cantidad media-baja de exportaciones respecto a las ventas y una cantidad baja de importaciones respecto a las compras.
+
+Sus cuentas por cobrar y cuentas por pagar tienen en su mayoría el valor de 3 o inferior, además, su rotación de cuentas por cobrar y cuentas por pagar tienen un valor de 2 o inferior, es decir, son empresas que cobran y pagan poco, sus pagos y cobros tienen poca rotación.
+
+La frecuencia de los ciclos financieros tiende a ser alta en los niveles 3 e inferior, media en los niveles 4 y 5 y baja en el nivel 6. Su ciclo de negocio tiende a estar en los niveles 4 o inferior y son pocos los miembros que están en un nivel de 5 o superior.
+
+### Grupo 4:
+
+#### Comportamiento en canales de entrada y salida:
+
+El grupo 4 se caracteriza por tener en promedio las transacciones más altas en todos canales de entrada y de salida, además, suelen utilizar los canales poco frecuentados.
+
+#### Comportamiento de estados financieros:
+
+El grupo 4 se caracteriza por ser un grupo que tiene un porcentaje considerable de recaudos, además de que la mayoría de sus pagos son realizados a personas naturales, suelen tener entre 1 y 2 puntos de ventas, aunque como en todos los grupos tienen una cantidad considerable de integrantes que no tienen punto de venta.
+
+Tanto en sus importaciones y exportaciones respecto a las compras y las ventas predomina el valor de 2, es decir, que son clientes que exportan a un nivel medio e importan a un nivel bajo o a un nivel de 2.
+
+Son clientes en los que predomina el valor más alto en cuentas por cobrar y cuentas por pagar, aunque su rotación de cuentas por pagar se caracteriza por tender a decrecer, mientras que su rotación de cuentas por cobrar tiende a ser homógenea, es decir que son clientes que cobran y pagan mucho, pero que sus cuentas por pagar rotan poco y su rotación en las cuentas por cobrar tiende a abarcar todas las categorías.
+
+En el valor de su inventario predomina el valor más alto, además en su rotación de inventarios predominan los valores de 3 o inferiores, lo cual es indicativo de que son clientes que tienen un valor alto de inventario y rotan poco.
+
+Tanto en su ciclo financiero y ciclo de negocio tienden a tener valtos, aunque en su ciclo de negocio predominan los valores de 4 o superiores.
+
+### Tabla de conclusiones generales
+
+| Grupo | Comportamiento en los canales transaccionales                                                                                                                                                                                                       | Recaudos, pagos a personas naturales y tipos de  puntos de venta                                                                                                             | Importaciones y exportaciones                                                                                                                                                                  | Valor de inventarios y rotación                                                                                   | Cuentas por cobrar, cuentas por pagar,  y rotaciones                                                                                                                       | Ciclos financieros y ciclos de negocio                                                                                                               |
+|-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1     | Pocas transacciones de entrada  y salida, uso de canales  frecuentados.                                                                                                                                                                             | Pocos recaudos, no suelen tener punto de venta y la  mayoría de pagos son a  personas jurídicas.                                                                             | Valores bajos en las importaciones y exportaciones.                                                                                                                                            | Poco valor en su  inventario y pocas rotaciones.                                                                  | Poco valor en sus cuentas por cobrar y cuentas por pagar. Baja predominancia en las rotaciones.                                                                            | Ciclos financieros y ciclos de negocio similares en día, con mayor frecuenca en el valor más alto.                                                   |
+| 2     | Tienen un pequeño grupo de  clientes que no realizan transacciones, transacciones salientes menores al 60% del promedio. Valores medio en los demás tipos de transacciones. Más de la mitad de sus miembros utilizan los canales poco frecuentados. | Muy pocos recaudos, más pagos a personas jurídicas que naturales, poseen al menos un tipo de punto de venta aunque con un subgrupo  pequeño de clientes sin puntos de venta. | Sus exportaciones tienden a ser medias  y sus miembros pueden estar en cualquier nivel de importaciones exceptuando el 5. Único grupo en el que hay un valor alto de exportaciones de nivel 4. | Rotan mucho su inventario y su inventario tiene un valor superior a 1.                                            | Cuentas por cobrar con valores entre 2, 3 y 6. Cuentas por  pagar alrededor de 2. Rotación de cuentas por cobrar de dos o superior y cuentas por pagar en cualquier valor. | Ciclos financieros y de negocio muy  altos.                                                                                                          |
+| 3     | La mayoría de sus transacciones ocupan más del 20% del promedio. Aparente normalidad alrededor de algunos valores para casi  cada tipo de transacción.   Más de la mitad de sus miembros no utilizan los canales poco frecuentados.                 | Muy pocos recaudos, más pagos a personas naturales que jurídicas, no suelen poseer un punto de venta y sí lo tienen, suelen tener de un solo tipo.                           | Cantidad media-baja de exportaciones respecto a las ventas y cantidad baja de importaciones respecto a las compras.                                                                            | Valor de inventario muy bajo, al igual que pocas rotaciones.                                                      | Empresas que cobran poco y  pagan poco, sus pagos y  cobros tienen poca rotación.                                                                                          | Ciclos financieros en su mayoría de  nivel 3 e inferior, con niveles medios en los valores de 4 y 5. Ciclos de negocio en los niveles 4 e  inferior. |
+| 4     | Transacciones en promedio más altas que la mayoría, porcentaje considerable de recaudos, suelen usar los canales poco frecuentados.                                                                                                                 | Tienen un porcentaje considerable de recaudos, la mayoría de sus  pagos son realizados a personas naturales. Tienen entre 1 y 2 tipos de puntos de venta.                    | Clientes que exportan a un nivel medio e  importan a un nivel  bajo.                                                                                                                           | Tienen muchas cuentas por cobrar y por pagar, sus pagos rotan muy poco, sus cobros rotan en todas las categorías. | Tienen un inventario de valor alto su inventario rota muy  poco.                                                                                                           | Ciclos de negocio y ciclos financieros de valores altos.                                                                                             |
+
+## Referencias bibliográficas
+
+* Zheng, A., & Casari, A. (2016). Feature Engineering for Machine Learning: Principles and Techniques for Data Scientists (1st ed.). O’Reilly Media.
+
+* Hastie, T., James, G., Witten, D.,  & Tibshirani, R. (2021). An Introduction to Statistical Learning: with Applications in R (2nd ed). Springer.
+
+* Kassambara, A. (2017). Practical Guide to Cluster Analysis in R: Unsupervised Machine Learning (Multivariate Analysis) (1st ed.). STHDA.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
