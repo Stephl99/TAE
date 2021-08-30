@@ -5,8 +5,8 @@ account: isabelaunal
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3904823
-bundleId: 4959640
+bundleId: 4978975
 url: https://isabelaunal.shinyapps.io/AppPredecirHijos/
-when: 1629836150.39564
+when: 1630298928.54399
 asMultiple: FALSE
 asStatic: FALSE
